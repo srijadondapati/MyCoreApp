@@ -45,3 +45,10 @@ steps:
     ArtifactName: 'drop'
     publishLocation: 'Container'
 
+- task: AzureWebApp@1
+  inputs:
+    azureSubscription: 'imp-sc-main'
+    appType: 'webApp'
+    appName: 'siara'
+    package: '$(System.DefaultWorkingDirectory)/**/*.zip'
+    deploymentMethod: 'auto'
