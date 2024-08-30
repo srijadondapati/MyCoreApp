@@ -1,43 +1,47 @@
+# Azure Pipelines YAML for ASP.NET Core 8.0 Application
+
 trigger:
   branches:
     include:
-      - master  # Include other branches if necessary
+      - master  # Trigger the pipeline on commits to the main branch
 
 pool:
-  vmImage: 'windows-latest'  # Use Windows-based agent
+  vmImage: 'windows-latest'
 
 variables:
   buildConfiguration: 'Release'
+  dotnetVersion: '8.x.x' # .NET 8 SDK version
 
-stages:
-  - stage: Build
-    jobs:
-      - job: Build
-        displayName: 'Build and Test .NET Desktop Application'
+steps:
+- task: UseDotNet@2
+  inputs:
+    packageType: 'sdk'
+    version: $(dotnetVersion)
+    installationPath: $(Agent.ToolsDirectory)/dotnet
 
-        steps:
-          - task: UseDotNet@2
-            displayName: 'Use .NET SDK'
-            inputs:
-              packageType: 'sdk'
-              version: '8.x.x'  # Use the version you are targeting
-              installationPath: $(Agent.ToolsDirectory)/dotnet
+- task: NuGetToolInstaller@1
 
-          - script: |
-              nuget restore YourSolution.sln
-            displayName: 'Restore NuGet Packages'
+- task: NuGetCommand@2
+  inputs:
+    restoreSolution: true
+    feedsToUse: 'select'
 
-          - script: |
-              msbuild YourSolution.sln /p:Configuration=$(buildConfiguration)
-            displayName: 'Build Solution'
+- task: DotNetCoreCLI@2
+  inputs:
+    command: 'build'
+    projects: '**/*.csproj'
+    arguments: '--configuration $(buildConfiguration)'
 
-          - script: |
-              vstest.console.exe **\*Test*.dll --platform:x64 --framework:.NETCoreApp,Version=v7.0
-            displayName: 'Run Unit Tests'
+- task: DotNetCoreCLI@2
+  inputs:
+    command: 'publish'
+    publishWebProjects: true
+    arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
+    zipAfterPublish: true
 
-          - task: PublishBuildArtifacts@1
-            displayName: 'Publish Build Artifacts'
-            inputs:
-              PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-              ArtifactName: 'drop'
-              publishLocation: 'Container'
+- task: PublishBuildArtifacts@1
+  inputs:
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+    ArtifactName: 'drop'
+    publishLocation: 'Container'
+
