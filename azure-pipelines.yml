@@ -10,14 +10,14 @@ pool:
 
 variables:
   buildConfiguration: 'Release'
-  dotnetVersion: '8.x.x' # .NET 8 SDK version
+  dotnetVersion: '8.x' # .NET 8 SDK version
 
 steps:
 - task: UseDotNet@2
   inputs:
     packageType: 'sdk'
-    version: $(dotnetVersion)
-    installationPath: $(Agent.ToolsDirectory)/dotnet
+    version: '8.x'
+    includePreviewVersions: true
 
 - task: NuGetToolInstaller@1
 
