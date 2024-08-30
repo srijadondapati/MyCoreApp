@@ -1,0 +1,43 @@
+trigger:
+  branches:
+    include:
+      - master  # Include other branches if necessary
+
+pool:
+  vmImage: 'windows-latest'  # Use Windows-based agent
+
+variables:
+  buildConfiguration: 'Release'
+
+stages:
+  - stage: Build
+    jobs:
+      - job: Build
+        displayName: 'Build and Test .NET Desktop Application'
+
+        steps:
+          - task: UseDotNet@2
+            displayName: 'Use .NET SDK'
+            inputs:
+              packageType: 'sdk'
+              version: '7.x.x'  # Use the version you are targeting
+              installationPath: $(Agent.ToolsDirectory)/dotnet
+
+          - script: |
+              nuget restore YourSolution.sln
+            displayName: 'Restore NuGet Packages'
+
+          - script: |
+              msbuild YourSolution.sln /p:Configuration=$(buildConfiguration)
+            displayName: 'Build Solution'
+
+          - script: |
+              vstest.console.exe **\*Test*.dll --platform:x64 --framework:.NETCoreApp,Version=v7.0
+            displayName: 'Run Unit Tests'
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish Build Artifacts'
+            inputs:
+              PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+              ArtifactName: 'drop'
+              publishLocation: 'Container'
