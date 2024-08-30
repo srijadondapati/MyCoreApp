@@ -20,7 +20,7 @@ stages:
             displayName: 'Use .NET SDK'
             inputs:
               packageType: 'sdk'
-              version: '7.x.x'  # Use the version you are targeting
+              version: '8.x.x'  # Use the version you are targeting
               installationPath: $(Agent.ToolsDirectory)/dotnet
 
           - script: |
