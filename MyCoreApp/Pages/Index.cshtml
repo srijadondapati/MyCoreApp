@@ -9,38 +9,154 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mountain Background Page</title>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"> <!-- Link to Bootstrap CSS -->
+    <title>Google - Swarna</title>
     <style>
         body {
             margin: 0;
             padding: 0;
-            background-image: url('https://images.pexels.com/photos/417173/pexels-photo-417173.jpeg'); /* Replace with your mountain image URL */
-            background-size: cover;
-            background-position: center;
-            height: 100vh;
-            color: white;
+            font-family: 'Arial', sans-serif;
+            background: #fff;
+            color: #333;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
-            text-align: center;
-            font-family: Arial, sans-serif;
+            height: 100vh;
         }
-        .content {
-            background: rgba(0, 0, 0, 0.6); /* Semi-transparent background for better readability */
-            padding: 30px;
-            border-radius: 15px;
+
+        .top-right {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            display: flex;
+            gap: 20px;
+        }
+
+        .top-right a {
+            color: #555;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .top-right img {
+            width: 24px;
+            height: 24px;
+            vertical-align: middle;
+        }
+
+        .logo {
+            font-size: 80px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            margin-top: 20vh;
+        }
+
+        .logo span {
+            color: #4285F4; /* Blue */
+        }
+
+        .logo span:nth-child(2) {
+            color: #EA4335; /* Red */
+        }
+
+        .logo span:nth-child(3) {
+            color: #FBBC05; /* Yellow */
+        }
+
+        .logo span:nth-child(4) {
+            color: #34A853; /* Green */
+        }
+
+        .logo span:nth-child(5) {
+            color: #EA4335; /* Red */
+        }
+
+        .logo span:nth-child(6) {
+            color: #4285F4; /* Blue */
+        }
+
+        .search-box {
+            margin-top: 20px;
+            width: 500px;
+            max-width: 90%;
+            display: flex;
+            align-items: center;
+            border: 1px solid #ccc;
+            border-radius: 24px;
+            padding: 10px 20px;
+            box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
+            background-color: white;
+        }
+
+        .search-box input {
+            flex-grow: 1;
+            border: none;
+            outline: none;
+            font-size: 18px;
+            padding: 5px;
+        }
+
+        .search-box button {
+            background-color: transparent;
+            border: none;
+            cursor: pointer;
+        }
+
+        .buttons {
+            margin-top: 30px;
+            display: flex;
+            gap: 20px;
+        }
+
+        .buttons button {
+            background-color: #f8f9fa;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            padding: 10px 20px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .buttons button:hover {
+            background-color: #e8e8e8;
         }
     </style>
 </head>
 <body>
 
-<div class="content">
-    <h1 class="display-4">Welcome Rahul Dondapati</h1>
-    <h2>the beauty of nature</h2>
-    <p>Explore our content and <a href="https://learn.microsoft.com/aspnet/core" class="text-white">learn more about our offerings</a>.</p>
-</div>
+    <div class="top-right">
+        <a href="#">Gmail</a>
+        <a href="#">Images</a>
+        <a href="#">
+            <img src="https://www.svgrepo.com/show/331655/google-apps.svg" alt="Google Apps">
+        </a>
+        <a href="#">
+            <img src="https://www.svgrepo.com/show/15781/user.svg" alt="User Icon">
+        </a>
+    </div>
+
+    <div class="logo">
+        <span>S</span>
+        <span>w</span>
+        <span>a</span>
+        <span>r</span>
+        <span>n</span>
+        <span>a</span>
+    </div>
+
+    <div class="search-box">
+        <input type="text" placeholder="Search Swarna...">
+        <button>
+            <img src="https://www.svgrepo.com/show/108460/search.svg" alt="Search" width="24px">
+        </button>
+    </div>
+
+    <div class="buttons">
+        <button>Google Search</button>
+        <button>I'm Feeling Lucky</button>
+    </div>
 
 </body>
 </html>
+
 
