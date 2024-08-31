@@ -1,5 +1,3 @@
-# Azure Pipelines YAML for ASP.NET Core 8.0 Application
-
 trigger:
   branches:
     include:
@@ -11,6 +9,8 @@ pool:
 variables:
   buildConfiguration: 'Release'
   dotnetVersion: '8.x' # .NET 8 SDK version
+  azureSubscription: 'webapp-google'  # Replace with your Azure subscription service connection
+  appName: 'sidhu'  # Replace with your Azure Web App name
   
 steps:
 - task: UseDotNet@2
@@ -23,6 +23,7 @@ steps:
 
 - task: NuGetCommand@2
   inputs:
+    command: 'restore'  # Explicitly specify the restore command
     restoreSolution: true
     feedsToUse: 'select'
 
@@ -45,11 +46,10 @@ steps:
     ArtifactName: 'drop'
     publishLocation: 'Container'
 
-
 - task: AzureWebApp@1
   inputs:
-    azureSubscription: 'webapp-google'
+    azureSubscription: '$(azureSubscription)'  # Use the variable for Azure subscription
     appType: 'webApp'
-    appName: 'sidhu'
+    appName: '$(appName)'  # Use the variable for the app name
     package: '$(System.DefaultWorkingDirectory)/**/*.zip'
     deploymentMethod: 'auto'
