@@ -11,9 +11,7 @@ pool:
 variables:
   buildConfiguration: 'Release'
   dotnetVersion: '8.x' # .NET 8 SDK version
-  azureSubscription: 'imp-sc-main' # Azure Subscription
-  webAppName: 'siara' # Azure Web App Name
-
+  
 steps:
 - task: UseDotNet@2
   inputs:
@@ -47,10 +45,11 @@ steps:
     ArtifactName: 'drop'
     publishLocation: 'Container'
 
+
 - task: AzureWebApp@1
   inputs:
-    azureSubscription: '$(azureSubscription)'
+    azureSubscription: 'webapp-google'
     appType: 'webApp'
-    appName: '$(webAppName)'
-    package: '$(Build.ArtifactStagingDirectory)/**/*.zip'
+    appName: 'sidhu'
+    package: '$(System.DefaultWorkingDirectory)/**/*.zip'
     deploymentMethod: 'auto'
