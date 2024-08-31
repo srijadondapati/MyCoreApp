@@ -3,7 +3,6 @@
 @{
     ViewData["Title"] = "Home page";
 }
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,6 +10,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Google - Swarna</title>
     <style>
+        @keyframes dropIn {
+            0% { opacity: 0; transform: translateY(-30px); }
+            50% { opacity: 0.5; transform: translateY(15px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes dropDelay {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+
         body {
             margin: 0;
             padding: 0;
@@ -21,6 +31,7 @@
             flex-direction: column;
             align-items: center;
             height: 100vh;
+            position: relative;
         }
 
         .top-right {
@@ -29,12 +40,19 @@
             right: 20px;
             display: flex;
             gap: 20px;
+            animation: dropIn 1s ease-out;
+            animation-delay: 0.5s;
         }
 
         .top-right a {
             color: #555;
             text-decoration: none;
             font-size: 14px;
+            transition: color 0.3s;
+        }
+
+        .top-right a:hover {
+            color: #000;
         }
 
         .top-right img {
@@ -48,6 +66,8 @@
             font-weight: bold;
             letter-spacing: 2px;
             margin-top: 20vh;
+            animation: dropIn 1s ease-out;
+            animation-delay: 0.2s;
         }
 
         .logo span {
@@ -85,6 +105,8 @@
             padding: 10px 20px;
             box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
             background-color: white;
+            animation: dropIn 1s ease-out;
+            animation-delay: 0.4s;
         }
 
         .search-box input {
@@ -114,11 +136,22 @@
             padding: 10px 20px;
             font-size: 14px;
             cursor: pointer;
-            transition: background-color 0.2s;
+            transition: background-color 0.2s, transform 0.2s;
+            animation: dropIn 1s ease-out;
         }
 
         .buttons button:hover {
             background-color: #e8e8e8;
+            transform: scale(1.05);
+        }
+
+        /* Add delay for button animation */
+        .buttons button:nth-child(1) {
+            animation-delay: 0.6s;
+        }
+
+        .buttons button:nth-child(2) {
+            animation-delay: 0.8s;
         }
     </style>
 </head>
@@ -158,5 +191,3 @@
 
 </body>
 </html>
-
-
