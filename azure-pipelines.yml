@@ -9,8 +9,7 @@ pool:
 variables:
   buildConfiguration: 'Release'
   dotnetVersion: '8.x' # .NET 8 SDK version
-  azureSubscription: 'webapp-google'  # Replace with your Azure subscription service connection
-  appName: 'sidhu'  # Replace with your Azure Web App name
+  
   
 steps:
 - task: UseDotNet@2
@@ -46,10 +45,3 @@ steps:
     ArtifactName: 'drop'
     publishLocation: 'Container'
 
-- task: AzureWebApp@1
-  inputs:
-    azureSubscription: '$(azureSubscription)'  # Use the variable for Azure subscription
-    appType: 'webApp'
-    appName: '$(appName)'  # Use the variable for the app name
-    package: '$(System.DefaultWorkingDirectory)/**/*.zip'
-    deploymentMethod: 'auto'
