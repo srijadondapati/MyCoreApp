@@ -1,155 +1,191 @@
-/* styles.css */
+/* Global Styles */
 body {
+    font-family: 'Arial', sans-serif;
     margin: 0;
     padding: 0;
-    background: linear-gradient(to top right, #FFDEE9, #B5FFFC);
-    font-family: 'Arial', sans-serif;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    overflow: hidden;
-    color: #333;
+    background: #2d2d2d; /* Dark background */
+    color: white; /* White text */
 }
 
-.container {
-    text-align: center;
-    max-width: 700px;
-    background: rgba(255, 255, 255, 0.8);
-    border-radius: 20px;
+/* Invitation Container */
+.invitation-container {
+    width: 100%;
+    max-width: 900px;
+    margin: 30px auto;
+    background: #333333; /* Dark background */
+    border-radius: 15px;
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
     padding: 40px;
-    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+    text-align: center;
+    opacity: 0;
+    animation: fadeIn 1.5s forwards;
+}
+
+/* Header Section */
+.header {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #ff6347;
+    padding: 20px 0;
+    border-radius: 10px 10px 0 0;
+}
+
+.header h1 {
+    margin: 0;
+    font-size: 38px;
+    letter-spacing: 2px;
+    font-weight: bold;
+    animation: slideIn 1.5s ease-out;
+}
+
+/* Birthday Girl Section */
+.birthday-girl {
+    font-size: 32px;
+    color: white;
+    font-weight: bold;
+    margin-top: 20px;
+    animation: fadeUp 1.5s ease-in-out;
+}
+
+/* Event Details */
+.event-details {
+    margin-top: 40px;
+    font-size: 24px;
+    line-height: 1.6;
+    animation: fadeUp 1.5s ease-in-out;
+}
+
+.event-details span {
+    font-weight: bold;
+    color: #ff4500;
+}
+
+/* Venue Color */
+.venue {
+    font-weight: bold;
+    color: white; /* Venue in white */
+    font-size: 26px;
+}
+
+/* Special Guest Animation */
+.special-guest {
+    margin-top: 20px;
+    font-size: 20px;
+    font-style: italic;
+    color: #f9f9f9;
+    animation: specialGuestAnimation 2s ease-out;
+}
+
+/* Event Date Highlight */
+.event-date {
+    font-size: 36px;
+    font-weight: bold;
+    color: white;
+    background-color: #ff4500;
+    padding: 10px 20px;
+    border-radius: 12px;
+    margin: 20px auto;
+    display: inline-block;
+    animation: bounceIn 1.5s ease-out;
+}
+
+/* Coming Button */
+.cta {
+    margin-top: 30px;
     position: relative;
-    overflow: hidden;
 }
 
-h1 {
-    font-size: 4rem;
-    color: #FF6F61;
-    margin-bottom: 20px;
-    animation: popIn 2s ease-out;
-}
-
-p {
-    font-size: 1.6rem;
-    margin-bottom: 30px;
-    line-height: 1.8;
-    animation: fadeIn 2.5s ease-out;
-}
-
-.heart {
-    font-size: 6rem;
-    color: #FF6F61;
-    animation: beatHeart 1.2s infinite ease-in-out;
-}
-
-.button {
-    background: #FF6F61;
+.cta a {
+    text-decoration: none;
+    background-color: #32cd32; /* Green color */
     color: white;
     padding: 15px 30px;
-    font-size: 1.5rem;
-    border: none;
-    border-radius: 30px;
-    cursor: pointer;
-    text-transform: uppercase;
-    box-shadow: 0 5px 15px rgba(255, 111, 97, 0.5);
-    transition: all 0.3s ease-in-out;
-    animation: bounceButton 3s infinite ease-in-out;
+    border-radius: 25px;
+    font-size: 20px;
+    font-weight: bold;
+    transition: background-color 0.3s ease, transform 0.3s ease;
 }
 
-.button:hover {
-    background: #e55b50;
+.cta a:hover {
+    background-color: #228b22; /* Dark green on hover */
+    color: white;
     transform: scale(1.1);
 }
 
-/* Slide-in animation */
-@keyframes slideIn {
-    from {
-        transform: translateX(-100%);
-    }
-    to {
-        transform: translateX(0);
-    }
+/* Vote Count */
+.vote-count {
+    font-size: 24px;
+    font-weight: bold;
+    color: white;
+    margin-top: 20px;
+    background: rgba(0, 0, 0, 0.5); /* Slightly dark background for count */
+    padding: 10px;
+    border-radius: 10px;
+    display: inline-block;
 }
 
-.animate-slide {
-    animation: slideIn 1s ease-out;
+/* Footer Section */
+.footer {
+    margin-top: 40px;
+    font-size: 14px;
+    color: white;
 }
 
-/* Background Animations */
-.floating-heart {
-    position: absolute;
-    width: 20px;
-    height: 20px;
-    background: red;
-    clip-path: polygon(50% 0%, 0% 50%, 50% 100%, 100% 50%);
-    animation: floatHearts 5s infinite;
-    opacity: 0.8;
+.footer a {
+    color: #ff6347;
+    text-decoration: none;
 }
 
-.floating-heart:nth-child(2) {
-    width: 30px;
-    height: 30px;
-    animation-duration: 6s;
-    animation-delay: 1s;
-}
-
-.floating-heart:nth-child(3) {
-    width: 25px;
-    height: 25px;
-    animation-duration: 7s;
-    animation-delay: 2s;
-}
-
-/* Keyframes for other animations */
-@keyframes popIn {
-    from {
-        transform: scale(0);
-        opacity: 0;
-    }
-    to {
-        transform: scale(1);
-        opacity: 1;
-    }
-}
-
+/* Animations */
 @keyframes fadeIn {
-    from {
-        opacity: 0;
-    }
-    to {
-        opacity: 1;
-    }
+    0% { opacity: 0; }
+    100% { opacity: 1; }
 }
 
-@keyframes beatHeart {
-    0%, 100% {
-        transform: scale(1);
-    }
-    50% {
-        transform: scale(1.2);
-    }
+@keyframes slideIn {
+    0% { transform: translateX(-50px); opacity: 0; }
+    100% { transform: translateX(0); opacity: 1; }
 }
 
-@keyframes bounceButton {
-    0%, 100% {
-        transform: translateY(0);
-    }
-    50% {
-        transform: translateY(-10px);
-    }
+@keyframes fadeUp {
+    0% { opacity: 0; transform: translateY(20px); }
+    100% { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes floatHearts {
-    0% {
-        transform: translateY(0) scale(1);
-        opacity: 1;
+@keyframes bounceIn {
+    0% { transform: scale(0); opacity: 0; }
+    50% { transform: scale(1.1); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes specialGuestAnimation {
+    0% { transform: scale(0); opacity: 0; }
+    50% { transform: scale(1.2); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* Responsive Design */
+@media screen and (max-width: 600px) {
+    .header h1 {
+        font-size: 28px;
     }
-    50% {
-        opacity: 0.8;
+
+    .birthday-girl {
+        font-size: 24px;
     }
-    100% {
-        transform: translateY(-150vh) scale(0.5);
-        opacity: 0;
+
+    .event-details {
+        font-size: 18px;
+    }
+
+    .event-date {
+        font-size: 28px;
+    }
+
+    .cta a {
+        font-size: 18px;
+    }
+
+    .vote-count {
+        font-size: 20px;
     }
 }
