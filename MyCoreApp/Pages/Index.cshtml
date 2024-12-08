@@ -1,25 +1,36 @@
-﻿@page
-@model MyCoreApp.Pages.IndexModel
-@{
-    ViewData["Title"] = "Home Page";
-}
-
+﻿<!-- index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fancy Buttons and Alerts</title>
-    <link href="~/css/style.css" rel="stylesheet" />
+    <title>Sorry, Srija</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+
     <div class="container">
+        <h1 class="animate-slide">Srija 💔</h1>
+        <p>
+            My Love,<br>
+    
+            Allam Bellam Nuvvenaa Pellam🌹
+        </p>
+        <div class="heart">❤️</div>
+
         <h1>Choose Your Answer</h1>
         <button class="button" onclick="showAlert('PanduThalli😍😍 Loves Sidhu')">YES</button>
         <button class="button" onclick="showAlert('Sidhu💕💕 Loves PanduThalli')">NO</button>
 
         <div id="alert-box" class="fancy-alert"></div>
     </div>
+
+    <!-- Floating hearts animation -->
+    <div class="floating-heart"></div>
+    <div class="floating-heart"></div>
+    <div class="floating-heart"></div>
+    <div class="floating-heart"></div>
+    <div class="floating-heart"></div>
 
     <script src="~/js/scripts.js"></script>
 </body>
