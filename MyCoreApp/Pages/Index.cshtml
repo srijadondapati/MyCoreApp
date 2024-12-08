@@ -1,30 +1,274 @@
-﻿<!-- index.html -->
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sorry, Srija</title>
-    <link rel="stylesheet" href="styles.css">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Birthday Invitation</title>
+    <style>
+        /* Global Styles */
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #2d2d2d; /* Dark background */
+            color: white; /* White text */
+        }
+
+        /* Invitation Container */
+        .invitation-container {
+            width: 100%;
+            max-width: 900px;
+            margin: 30px auto;
+            background: #333333; /* Dark background */
+            border-radius: 15px;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            text-align: center;
+            opacity: 0;
+            animation: fadeIn 1.5s forwards;
+        }
+
+        /* Header Section */
+        .header {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #ff6347;
+            padding: 20px 0;
+            border-radius: 10px 10px 0 0;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 38px;
+            letter-spacing: 2px;
+            font-weight: bold;
+            animation: slideIn 1.5s ease-out;
+        }
+
+        /* Birthday Girl Section */
+        .birthday-girl {
+            font-size: 32px;
+            color: white;
+            font-weight: bold;
+            margin-top: 20px;
+            animation: fadeUp 1.5s ease-in-out;
+        }
+
+        .birthday-girl h1 {
+            color: #00ffc8; /* Bright color */
+        }
+
+        /* Event Details */
+        .event-details {
+            margin-top: 40px;
+            font-size: 24px;
+            line-height: 1.6;
+            animation: fadeUp 1.5s ease-in-out;
+        }
+
+        .event-details span {
+            font-weight: bold;
+            color: #ff4500;
+        }
+
+        /* Special Guest Section */
+        .special-guest {
+            margin-top: 20px;
+            font-size: 20px;
+            font-style: italic;
+            color: #f9f9f9;
+            animation: specialGuestAnimation 2s ease-out;
+        }
+
+        /* Event Date Highlight */
+        .event-date {
+            font-size: 36px;
+            font-weight: bold;
+            color: white;
+            background-color: #ff4500;
+            padding: 10px 20px;
+            border-radius: 12px;
+            margin: 20px auto;
+            display: inline-block;
+            animation: bounceIn 1.5s ease-out;
+        }
+
+        /* Coming Button */
+        .cta {
+            margin-top: 30px;
+            position: relative;
+        }
+
+        .cta a {
+            text-decoration: none;
+            background-color: #32cd32; /* Green color */
+            color: white;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 20px;
+            font-weight: bold;
+            transition: background-color 0.3s ease, transform 0.3s ease;
+        }
+
+        .cta a:hover {
+            background-color: #228b22; /* Dark green on hover */
+            color: white;
+            transform: scale(1.1);
+        }
+
+        /* Vote Count */
+        .vote-count {
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            margin-top: 20px;
+            background: rgba(0, 0, 0, 0.5); /* Slightly dark background for count */
+            padding: 10px;
+            border-radius: 10px;
+            display: inline-block;
+        }
+
+        /* Footer Section */
+        .footer {
+            margin-top: 40px;
+            font-size: 14px;
+            color: white;
+        }
+
+        .footer a {
+            color: #ff6347;
+            text-decoration: none;
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+
+        @keyframes slideIn {
+            0% { transform: translateX(-50px); opacity: 0; }
+            100% { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes fadeUp {
+            0% { opacity: 0; transform: translateY(20px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes bounceIn {
+            0% { transform: scale(0); opacity: 0; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Special Guest Animation */
+        @keyframes specialGuestAnimation {
+            0% { transform: scale(0); opacity: 0; }
+            50% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Mobile View Adjustments */
+        @media screen and (max-width: 600px) {
+            .invitation-container {
+                padding: 20px;
+            }
+
+            .header h1 {
+                font-size: 28px;
+            }
+
+            .birthday-girl {
+                font-size: 24px;
+            }
+
+            .birthday-girl h1 {
+                font-size: 28px;
+            }
+
+            .event-details {
+                font-size: 18px;
+            }
+
+            .event-date {
+                font-size: 28px;
+                padding: 8px 16px;
+            }
+
+            .cta a {
+                font-size: 18px;
+                padding: 12px 25px;
+            }
+
+            .vote-count {
+                font-size: 18px;
+                padding: 8px 16px;
+            }
+
+            .footer {
+                font-size: 12px;
+            }
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <h1 class="animate-slide"> 💔 </h1>
-        <p>
-            My dear Srija,<br>
-            Allam Bellam Nuvvena Pellam❤️
-        </p>
-        <div class="heart">❤️</div>
-        <button class="button" onclick="showAlert('I love you, Srija!')">Forgive Me?</button>
+    <div class="invitation-container">
+        <!-- Header Section -->
+        <div class="header">
+            <h1>You're Invited to a Birthday🎂 Celebration!🎆</h1>
+        </div>
+
+        <!-- Birthday Girl Name -->
+        <div class="birthday-girl">
+            <p>Join us in Celebrating The Birthday</p> 
+            <h1><strong style="color: #00ffc8;">Mardhal🐒</strong></h1> <!-- Mardhal in bright color -->
+        </div>
+
+        <!-- Event Details -->
+        <div class="event-details">
+            <p><span>Venue:</span> Tatipaka </p>
+        </div>
+
+        <!-- Special Guest -->
+        <div class="special-guest">
+            <p><span>Special Guest:</span> Rahul Dondapati</p>
+        </div>
+
+        <!-- Event Date Highlight -->
+        <div class="event-date">
+            <p>28th December 2024</p>
+        </div>
+
+        <!-- Coming Button and Count -->
+        <div class="cta">
+            <p>We'd love to know if you're interested in attending!</p>
+            <a href="#" id="coming-button" onclick="vote()">Coming</a>
+            <div class="vote-count" id="vote-count">Count: 0</div>
+        </div>
+
+        <!-- Footer Section -->
+        <div class="footer">
+            <p>We look forward to celebrating with you! For more details, feel free to <a href="#">contact us</a>.</p>
+        </div>
     </div>
 
-    <!-- Floating hearts animation -->
-    <div class="floating-heart"></div>
-    <div class="floating-heart"></div>
-    <div class="floating-heart"></div>
-    <div class="floating-heart"></div>
-    <div class="floating-heart"></div>
+    <script>
+        let voteCount = 0;
 
-    <script src="scripts.js"></script>
+        function vote() {
+            // Increment the vote count and update the display
+            voteCount++;
+            document.getElementById('vote-count').innerHTML = `Count: ${voteCount}`;
+
+            // Change the button to show it's been clicked
+            alert("Thank you for voting! We appreciate your response.");
+            document.getElementById('coming-button').innerHTML = "Coming!";
+            document.getElementById('coming-button').style.backgroundColor = "#ddd";
+            document.getElementById('coming-button').style.color = "#333";
+            document.getElementById('coming-button').style.cursor = "not-allowed";
+            document.getElementById('coming-button').disabled = true;
+        }
+    </script>
 </body>
 </html>
