@@ -69,6 +69,20 @@
             transform: scale(1.1);
         }
 
+        /* Slide-in animation */
+        @keyframes slideIn {
+            from {
+                transform: translateX(-100%);
+            }
+            to {
+                transform: translateX(0);
+            }
+        }
+
+        .animate-slide {
+            animation: slideIn 1s ease-out;
+        }
+
         /* Background Animations */
         .floating-heart {
             position: absolute;
@@ -94,6 +108,7 @@
             animation-delay: 2s;
         }
 
+        /* Keyframes for other animations */
         @keyframes popIn {
             from {
                 transform: scale(0);
@@ -149,7 +164,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>I'm Sorry, Srija 💔</h1>
+        <h1 class="animate-slide">I'm Sorry, Srija 💔</h1> <!-- Apply the slideIn animation here -->
         <p>
             My dearest Srija,<br>
             sorry,<br>
