@@ -8,7 +8,8 @@ pool:
 
 variables:
   buildConfiguration: 'Release'
-  dotnetVersion: '8.x' # .NET 8 SDK version
+  dotnetVersion: '3.x' # .NET 8 SDK version
+
   
   
 steps:
