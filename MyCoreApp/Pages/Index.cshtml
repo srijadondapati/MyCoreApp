@@ -1,200 +1,82 @@
-﻿@page
-@model IndexModel
-@{
-    ViewData["Title"] = "Home page";
-}
-@page
-@model MyCoreApp.Pages.IndexModel
-
-@page
-@model MyCoreApp.Pages.IndexModel
-
-<!DOCTYPE html>
-<html>
+﻿<!DOCTYPE html>
+<html lang="en">
 <head>
-    <meta charset="utf-8" />
-    <title>Google - Swarna</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sidhu - Google Style</title>
     <style>
-        /* Keyframes for water drop animation */
-        @keyframes dropIn {
-            0% { opacity: 0; transform: translateY(-30px); }
-            50% { opacity: 0.5; transform: translateY(15px); }
-            100% { opacity: 1; transform: translateY(0); }
-        }
-
-        /* Body styling */
         body {
             margin: 0;
-            padding: 0;
-            font-family: 'Arial', sans-serif;
-            background: #fff;
-            color: #333;
             display: flex;
-            flex-direction: column;
+            justify-content: center;
             align-items: center;
             height: 100vh;
-            position: relative;
-            overflow: hidden; /* Prevent scrollbars if elements go out of view */
+            background-color: white;
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
         }
-
-        /* Top-right links styling */
-        .top-right {
-            position: absolute;
-            top: 15px;
-            right: 20px;
+        .name {
             display: flex;
-            gap: 20px;
-            animation: dropIn 1s ease-out;
-            animation-delay: 0.5s;
-        }
-
-        .top-right a {
-            color: #555;
-            text-decoration: none;
-            font-size: 14px;
-            transition: color 0.3s;
-        }
-
-        .top-right a:hover {
-            color: #000;
-        }
-
-        .top-right img {
-            width: 24px;
-            height: 24px;
-            vertical-align: middle;
-        }
-
-        /* Logo styling */
-        .logo {
-            font-size: 80px;
+            gap: 5px;
+            font-size: 4rem;
             font-weight: bold;
-            letter-spacing: 2px;
-            margin-top: 20vh;
-            animation: dropIn 1s ease-out;
+            color: #4285F4; /* Google's default blue color */
+        }
+        .name span {
+            display: inline-block;
+            animation: bounce 3.5s infinite;
+        }
+        .name span:nth-child(1) {
+            color: #4285F4; /* Blue */
+            animation-delay: 0s;
+        }
+        .name span:nth-child(2) {
+            color: #EA4335; /* Red */
             animation-delay: 0.2s;
         }
-
-        .logo span {
-            color: #4285F4; /* Blue */
-        }
-
-        .logo span:nth-child(2) {
-            color: #EA4335; /* Red */
-        }
-
-        .logo span:nth-child(3) {
+        .name span:nth-child(3) {
             color: #FBBC05; /* Yellow */
-        }
-
-        .logo span:nth-child(4) {
-            color: #34A853; /* Green */
-        }
-
-        .logo span:nth-child(5) {
-            color: #EA4335; /* Red */
-        }
-
-        .logo span:nth-child(6) {
-            color: #4285F4; /* Blue */
-        }
-
-        /* Search box styling */
-        .search-box {
-            margin-top: 20px;
-            width: 500px;
-            max-width: 90%;
-            display: flex;
-            align-items: center;
-            border: 1px solid #ccc;
-            border-radius: 24px;
-            padding: 10px 20px;
-            box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
-            background-color: white;
-            animation: dropIn 1s ease-out;
             animation-delay: 0.4s;
         }
-
-        .search-box input {
-            flex-grow: 1;
-            border: none;
-            outline: none;
-            font-size: 18px;
-            padding: 5px;
-        }
-
-        .search-box button {
-            background-color: transparent;
-            border: none;
-            cursor: pointer;
-        }
-
-        /* Buttons styling */
-        .buttons {
-            margin-top: 30px;
-            display: flex;
-            gap: 20px;
-        }
-
-        .buttons button {
-            background-color: #f8f9fa;
-            border: 1px solid #dadce0;
-            border-radius: 4px;
-            padding: 10px 20px;
-            font-size: 14px;
-            cursor: pointer;
-            transition: background-color 0.2s, transform 0.2s;
-            animation: dropIn 1s ease-out;
-        }
-
-        .buttons button:hover {
-            background-color: #e8e8e8;
-            transform: scale(1.05);
-        }
-
-        /* Add delay for button animation */
-        .buttons button:nth-child(1) {
+        .name span:nth-child(4) {
+            color: #34A853; /* Green */
             animation-delay: 0.6s;
         }
-
-        .buttons button:nth-child(2) {
+        .name span:nth-child(5) {
+            color: #EA4335; /* Red */
             animation-delay: 0.8s;
+        }
+
+        @keyframes bounce {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-50px);
+            }
+        }
+
+        /* Google-styled footer */
+        footer {
+            position: fixed;
+            bottom: 10px;
+            width: 100%;
+            text-align: center;
+            font-size: 40px;
+            color: #70757a;
         }
     </style>
 </head>
 <body>
-
-    <div class="top-right">
-        <a href="#">Gmail</a>
-        <a href="#">Images</a>
-        <a href="#">
-            <img src="https://www.svgrepo.com/show/331655/google-apps.svg" alt="Google Apps">
-        </a>
-        <a href="#">
-            <img src="https://www.svgrepo.com/show/15781/user.svg" alt="User Icon">
-        </a>
-    </div>
-
-    <div class="logo">
+    <div class="name">
         <span>S</span>
-        <span>w</span>
-        <span>a</span>
-        <span>r</span>
-        <span>n</span>
-        <span>a</span>
+        <span>I</span>
+        <span>D</span>
+        <span>H</span>
+        <span>U</span>
     </div>
-
-    <div class="search-box">
-        <input type="text" placeholder="Search Swarna...">
-        <button>
-            <img src="https://www.svgrepo.com/show/108460/search.svg" alt="Search" width="24px">
-        </button>
-    </div>
-
-    <div class="buttons">
-        <button>Google Search</button>
-        <button>I'm Feeling Lucky</button>
-    </div>
-
+    <footer>
+        Made with <span style="color: #EA4335;">❤</span> by Donley inspired by Google
+    </footer>
 </body>
 </html>
