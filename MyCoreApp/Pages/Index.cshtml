@@ -5,51 +5,117 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>Birthday Invitation</title>
-    <!-- Link to external CSS file -->
-    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f9f9f9;
+            color: #333;
+        }
+        .invitation-container {
+            width: 100%;
+            max-width: 900px;
+            margin: 20px auto;
+            background: #fff;
+            border-radius: 15px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            text-align: center;
+        }
+        .header {
+            background-color: #ff7f50;
+            color: white;
+            padding: 15px 0;
+            border-radius: 10px 10px 0 0;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 36px;
+            letter-spacing: 2px;
+        }
+        .birthday-girl {
+            font-size: 28px;
+            color: #ff6347;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+        .event-details {
+            margin-top: 40px;
+            font-size: 20px;
+            line-height: 1.6;
+        }
+        .event-details span {
+            font-weight: bold;
+            color: #ff6347;
+        }
+        .special-guest {
+            margin-top: 20px;
+            font-size: 20px;
+            font-style: italic;
+            color: #555;
+        }
+        .cta {
+            margin-top: 30px;
+        }
+        .cta a {
+            text-decoration: none;
+            background-color: #ff6347;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 18px;
+            transition: background-color 0.3s ease;
+        }
+        .cta a:hover {
+            background-color: #ff4500;
+        }
+        .footer {
+            margin-top: 40px;
+            font-size: 14px;
+            color: #777;
+        }
+        .footer a {
+            color: #ff6347;
+            text-decoration: none;
+        }
+        @media screen and (max-width: 600px) {
+            .header h1 {
+                font-size: 28px;
+            }
+            .birthday-girl {
+                font-size: 24px;
+            }
+            .event-details {
+                font-size: 18px;
+            }
+            .special-guest {
+                font-size: 18px;
+            }
+        }
+    </style>
 </head>
 <body>
     <div class="invitation-container">
-        <!-- Header Section -->
         <div class="header">
-            <h1>You're Invited to a Birthday🎂 Celebration!🎆</h1>
+            <h1>You're Invited to a Birthday Celebration!</h1>
         </div>
-
-        <!-- Birthday Girl Name -->
         <div class="birthday-girl">
-            <p>Join us in Celebrating The Birthday</p> 
-            <h1><strong style="color: #00ffc8;">Mardhal🐒</strong></h1>
+            <p>Join us in celebrating the birthday of <strong>Chitti Mardhal</strong></p>
         </div>
-
-        <!-- Event Details -->
         <div class="event-details">
-            <p><span>Venue:</span> Tatipaka</p>
+            <p><span>Date:</span> 28th December 2024</p>
+            <p><span>Venue:</span> Tatipaka Matam</p>
         </div>
-
-        <!-- Special Guest -->
         <div class="special-guest">
             <p><span>Special Guest:</span> Rahul Dondapati</p>
         </div>
-
-        <!-- Event Date Highlight -->
-        <div class="event-date">
-            <p>28th December 2024</p>
-        </div>
-
-        <!-- Coming Button and Count -->
         <div class="cta">
-            <p>We'd love to know if you're interested in attending!</p>
-            <a href="#" id="coming-button" onclick="vote()">Coming</a>
-            <div class="vote-count" id="vote-count">Count: 0</div>
+            <a href="#">RSVP Now</a>
         </div>
-
-        <!-- Footer Section -->
         <div class="footer">
             <p>We look forward to celebrating with you! For more details, feel free to <a href="#">contact us</a>.</p>
         </div>
     </div>
-
-    <!-- Link to external JS file -->
-    <script src="script.js"></script>
 </body>
 </html>
