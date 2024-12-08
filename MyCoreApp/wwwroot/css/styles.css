@@ -1,44 +1,75 @@
-/* Basic body and container styling */
 body {
-    margin: 0;
-    padding: 0;
-    background: linear-gradient(to top right, #FFDEE9, #B5FFFC);
+    background: #f0f8ff;
     font-family: 'Arial', sans-serif;
     display: flex;
     justify-content: center;
     align-items: center;
     height: 100vh;
-    overflow: hidden;
+    margin: 0;
     color: #333;
 }
 
 .container {
     text-align: center;
-    max-width: 700px;
-    background: rgba(255, 255, 255, 0.8);
-    border-radius: 20px;
-    padding: 40px;
-    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
-    position: relative;
-    overflow: hidden;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 15px;
+    padding: 50px;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    width: 80%;
+    max-width: 500px;
 }
 
-/* Heading and Paragraph styling */
 h1 {
-    font-size: 4rem;
+    font-size: 2.5rem;
+    margin-bottom: 40px;
     color: #FF6F61;
-    margin-bottom: 20px;
-    animation: popIn 2s ease-out;
 }
 
-p {
-    font-size: 1.6rem;
-    margin-bottom: 30px;
-    line-height: 1.8;
-    animation: fadeIn 2.5s ease-out;
+.button {
+    background: linear-gradient(45deg, #FF6F61, #FFB6C1);
+    color: white;
+    padding: 15px 40px;
+    font-size: 1.2rem;
+    border: none;
+    border-radius: 30px;
+    cursor: pointer;
+    box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
+    margin: 10px;
+    transition: transform 0.3s, background-color 0.3s;
 }
 
-.heart {
-    font-size: 6rem;
-    color: #FF6F61;
-    animat
+.button:hover {
+    transform: scale(1.1);
+    background-color: #e55b50;
+}
+
+.button:active {
+    transform: scale(0.95);
+}
+
+/* Fancy Alert Styles */
+.fancy-alert {
+    background-color: #FF6F61;
+    color: white;
+    font-size: 1.5rem;
+    padding: 20px;
+    border-radius: 15px;
+    animation: fadeInAlert 1s ease-out;
+    text-align: center;
+    margin-top: 20px;
+    display: none;
+}
+
+@keyframes fadeInAlert {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* Style for displaying alert */
+.show-alert {
+    display: block;
+}
