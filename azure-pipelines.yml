@@ -20,6 +20,9 @@ steps:
     includePreviewVersions: true
 
 - task: NuGetToolInstaller@1
+  inputs:
+    versionSpec: '5.8.x'
+
 
 - task: NuGetCommand@2
   inputs:
