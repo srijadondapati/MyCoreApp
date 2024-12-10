@@ -5,16 +5,16 @@ namespace MyCoreApp.Pages
 {
     public class IndexModel : PageModel
     {
-        // Ensure all properties are public and accessible in the Razor page
+        // Make sure these properties are public
         public string BirthdayPerson { get; set; }
         public string Venue { get; set; }
         public string SpecialGuest { get; set; }
         public DateTime EventDate { get; set; }
 
-        // OnGet method to set default values
+        // Initialize the properties in the OnGet method
         public void OnGet()
         {
-            // Initialize properties here
+            // Example values; replace them as per your requirements
             BirthdayPerson = "Mardhal";
             Venue = "Tatipaka";
             SpecialGuest = "Rahul Dondapati";
