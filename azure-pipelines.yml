@@ -54,7 +54,7 @@ steps:
   inputs:
     azureSubscription: 'Basic-terraform'
     appType: 'webApp'
-    appName: 'siara'
+    appName: 'siarastanley'
     package: '$(System.DefaultWorkingDirectory)/**/*.zip'
     deploymentMethod: 'auto'
 
