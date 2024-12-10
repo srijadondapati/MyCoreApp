@@ -10,8 +10,6 @@ variables:
   buildConfiguration: 'Release'
   dotnetVersion: '8.x' # .NET 8 SDK version
 
-  
-  
 steps:
 - task: UseDotNet@2
   inputs:
@@ -22,7 +20,6 @@ steps:
 - task: NuGetToolInstaller@1
   inputs:
     versionSpec: '5.8.x'
-
 
 - task: NuGetCommand@2
   inputs:
@@ -49,12 +46,10 @@ steps:
     ArtifactName: 'drop'
     publishLocation: 'Container'
 
-
 - task: AzureWebApp@1
   inputs:
     azureSubscription: 'Basic-terraform'
     appType: 'webApp'
     appName: 'siarastanley'
-    package: '$(System.DefaultWorkingDirectory)/**/*.zip'
+    package: '$(Build.ArtifactStagingDirectory)/**/*.zip'  # Corrected package path
     deploymentMethod: 'auto'
-
