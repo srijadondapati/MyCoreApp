@@ -4,15 +4,14 @@ trigger:
       - master  # Trigger the pipeline on commits to the master branch
 
 pool:
-  vmImage: 'ubuntu-latest'
+  vmImage: 'windows-latest'
 
 variables:
   buildConfiguration: 'Release'
 
 steps:
-# Step to checkout code (if needed)
-- task: Checkout@1
-  displayName: 'Checkout code'
+# Checkout the code repository using default behavior
+- checkout: self  # This is the default behavior, ensuring that the pipeline uses the repository it's running in.
 
 # Step to copy static website files (HTML, CSS, JS) to the artifact staging directory
 - task: CopyFiles@2
@@ -21,13 +20,13 @@ steps:
     Contents: '**/*'  # Include all files (HTML, CSS, JS, etc.)
     TargetFolder: '$(Build.ArtifactStagingDirectory)'
 
-# Ensure that files are zipped before deploying (if required)
-- task: DotNetCoreCLI@2
+# Optionally, zip the content if required (skip this step if not needed)
+- task: ArchiveFiles@2
   inputs:
-    command: 'publish'
-    publishWebProjects: true
-    arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
-    zipAfterPublish: true
+    rootFolderOrFile: '$(Build.ArtifactStagingDirectory)'
+    includeRootFolder: false
+    archiveType: 'zip'
+    archiveFile: '$(Build.ArtifactStagingDirectory)/drop/static-site.zip'
 
 # Step to deploy static files to Azure Web App
 - task: AzureWebApp@1
@@ -35,5 +34,5 @@ steps:
     azureSubscription: 'Basic-terraform'
     appType: 'webApp'
     appName: 'siarastanley'
-    package: '$(Build.ArtifactStagingDirectory)/drop/**/*.zip'  # Correct package path for zip
+    package: '$(Build.ArtifactStagingDirectory)/drop/static-site.zip'  # Using the zip file created
     deploymentMethod: 'auto'
