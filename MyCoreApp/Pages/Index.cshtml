@@ -1,12 +1,46 @@
-﻿<!DOCTYPE html>
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Home page";
+}
+
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hello World</title>
+    <title>Mountain Background Page</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"> <!-- Link to Bootstrap CSS -->
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-image: url('https://images.pexels.com/photos/417173/pexels-photo-417173.jpeg'); /* Replace with your mountain image URL */
+            background-size: cover;
+            background-position: center;
+            height: 100vh;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            font-family: Arial, sans-serif;
+        }
+        .content {
+            background: rgba(0, 0, 0, 0.6); /* Semi-transparent background for better readability */
+            padding: 30px;
+            border-radius: 15px;
+        }
+    </style>
 </head>
 <body>
-    <h1>Hello, World!</h1>
-    <p>Welcome to your first HTML page.</p>
+
+<div class="content">
+    <h1 class="display-4">Welcome Rahul Dondapati</h1>
+    <h2>the beauty of nature</h2>
+    <p>Explore our content and <a href="https://learn.microsoft.com/aspnet/core" class="text-white">learn more about our offerings</a>.</p>
+</div>
+
 </body>
 </html>
+
