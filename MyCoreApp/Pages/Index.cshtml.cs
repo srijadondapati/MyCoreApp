@@ -5,7 +5,7 @@ namespace MyCoreApp.Pages
 {
     public class IndexModel : PageModel
     {
-        // Make sure these properties are public
+        // Define public properties
         public string BirthdayPerson { get; set; }
         public string Venue { get; set; }
         public string SpecialGuest { get; set; }
@@ -14,11 +14,11 @@ namespace MyCoreApp.Pages
         // Initialize the properties in the OnGet method
         public void OnGet()
         {
-            // Example values; replace them as per your requirements
+            // Example values; adjust these as necessary
             BirthdayPerson = "Mardhal";
             Venue = "Tatipaka";
             SpecialGuest = "Rahul Dondapati";
-            EventDate = new DateTime(2024, 12, 28);
+            EventDate = new DateTime(2024, 12, 28);  // Example event date
         }
     }
 }
