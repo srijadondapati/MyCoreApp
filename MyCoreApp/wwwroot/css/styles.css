@@ -1,0 +1,80 @@
+/* Global Styles */
+body {
+    font-family: 'Arial', sans-serif;
+    margin: 0;
+    padding: 0;
+    background: #2d2d2d; /* Dark background */
+    color: white; /* White text */
+}
+
+/* Invitation Container */
+.invitation-container {
+    width: 100%;
+    max-width: 900px;
+    margin: 30px auto;
+    background: #333333;
+    border-radius: 15px;
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+    padding: 40px;
+    text-align: center;
+    opacity: 0;
+    animation: fadeIn 1.5s forwards;
+}
+
+/* Header Section */
+.header {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #ff6347;
+    padding: 20px 0;
+    border-radius: 10px 10px 0 0;
+}
+
+.header h1 {
+    margin: 0;
+    font-size: 38px;
+    letter-spacing: 2px;
+    font-weight: bold;
+    animation: slideIn 1.5s ease-out;
+}
+
+/* Event Details */
+.event-details {
+    margin-top: 40px;
+    font-size: 24px;
+    line-height: 1.6;
+    animation: fadeUp 1.5s ease-in-out;
+}
+
+/* Button and Count */
+.cta a {
+    text-decoration: none;
+    background-color: #32cd32;
+    color: white;
+    padding: 15px 30px;
+    border-radius: 25px;
+    font-size: 20px;
+    font-weight: bold;
+    transition: background-color 0.3s ease, transform 0.3s ease;
+}
+
+.cta a:hover {
+    background-color: #228b22;
+    color: white;
+    transform: scale(1.1);
+}
+
+/* Animations */
+@keyframes fadeIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+}
+
+@keyframes slideIn {
+    0% { transform: translateX(-50px); opacity: 0; }
+    100% { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes fadeUp {
+    0% { opacity: 0; transform: translateY(20px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
