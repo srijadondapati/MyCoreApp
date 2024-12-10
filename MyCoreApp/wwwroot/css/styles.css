@@ -37,9 +37,18 @@ body {
     animation: slideIn 1.5s ease-out;
 }
 
+/* Birthday Image Section */
+.birthday-image img {
+    width: 100%;
+    max-width: 400px;
+    border-radius: 15px;
+    margin: 20px 0;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
 /* Event Details */
 .event-details {
-    margin-top: 40px;
+    margin-top: 20px;
     font-size: 24px;
     line-height: 1.6;
     animation: fadeUp 1.5s ease-in-out;
