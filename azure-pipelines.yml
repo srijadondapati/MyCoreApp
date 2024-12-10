@@ -30,7 +30,7 @@ steps:
 - task: DotNetCoreCLI@2
   inputs:
     command: 'build'
-    projects: '*/.csproj'
+    projects: '**/*.csproj'  # Corrected to match all .csproj files
     arguments: '--configuration $(buildConfiguration)'
 
 - task: DotNetCoreCLI@2
@@ -51,5 +51,5 @@ steps:
     azureSubscription: 'Basic-terraform'
     appType: 'webApp'
     appName: 'siarastanley'
-    package: '$(Build.ArtifactStagingDirectory)/*/.zip'  # Corrected package path
+    package: '$(Build.ArtifactStagingDirectory)/*.zip'  # Corrected package path
     deploymentMethod: 'auto'
