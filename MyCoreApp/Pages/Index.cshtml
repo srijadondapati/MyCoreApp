@@ -1,5 +1,5 @@
 ﻿@page
-@model YourNamespace.Pages.IndexModel  <!-- Only required for Razor Pages -->
+@model MyCoreApp.Pages.IndexModel  <!-- Razor Page Model Reference -->
 
 <!DOCTYPE html>
 <html lang="en">
@@ -8,9 +8,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>Birthday Invitation</title>
-    <style>
-        /* CSS from your provided code remains the same */
-    </style>
+    <link href="~/css/styles.css" rel="stylesheet" /> <!-- Link to external CSS -->
 </head>
 <body>
     <div class="invitation-container">
@@ -19,28 +17,28 @@
             <h1>You're Invited to a Birthday🎂 Celebration!🎆</h1>
         </div>
 
-        <!-- Birthday Girl Name -->
+        <!-- Birthday Person Section -->
         <div class="birthday-girl">
-            <p>Join us in Celebrating The Birthday</p> 
-            <h1><strong style="color: #00ffc8;">@Model.BirthdayPerson</strong></h1> <!-- Dynamic name via Razor -->
+            <p>Join us in Celebrating The Birthday</p>
+            <h1><strong style="color: #00ffc8;">@Model.BirthdayPerson</strong></h1> <!-- Dynamic Birthday Name -->
         </div>
 
-        <!-- Event Details -->
+        <!-- Event Details Section -->
         <div class="event-details">
-            <p><span>Venue:</span> @Model.Venue</p> <!-- Dynamic venue via Razor -->
+            <p><span>Venue:</span> @Model.Venue</p> <!-- Dynamic Venue -->
         </div>
 
-        <!-- Special Guest -->
+        <!-- Special Guest Section -->
         <div class="special-guest">
-            <p><span>Special Guest:</span> @Model.SpecialGuest</p> <!-- Dynamic guest via Razor -->
+            <p><span>Special Guest:</span> @Model.SpecialGuest</p> <!-- Dynamic Special Guest -->
         </div>
 
-        <!-- Event Date Highlight -->
+        <!-- Event Date Section -->
         <div class="event-date">
-            <p>@Model.EventDate.ToString("dd MMM yyyy")</p> <!-- Dynamic date via Razor -->
+            <p>@Model.EventDate.ToString("dd MMM yyyy")</p> <!-- Dynamic Event Date -->
         </div>
 
-        <!-- Coming Button and Count -->
+        <!-- RSVP Button and Count -->
         <div class="cta">
             <p>We'd love to know if you're interested in attending!</p>
             <a href="#" id="coming-button" onclick="vote()">Coming</a>
@@ -53,22 +51,6 @@
         </div>
     </div>
 
-    <script>
-        let voteCount = 0;
-
-        function vote() {
-            // Increment the vote count and update the display
-            voteCount++;
-            document.getElementById('vote-count').innerHTML = `Count: ${voteCount}`;
-
-            // Change the button to show it's been clicked
-            alert("Thank you for voting! We appreciate your response.");
-            document.getElementById('coming-button').innerHTML = "Coming!";
-            document.getElementById('coming-button').style.backgroundColor = "#ddd";
-            document.getElementById('coming-button').style.color = "#333";
-            document.getElementById('coming-button').style.cursor = "not-allowed";
-            document.getElementById('coming-button').disabled = true;
-        }
-    </script>
+    <script src="~/js/script.js"></script> <!-- Link to external JS -->
 </body>
 </html>
