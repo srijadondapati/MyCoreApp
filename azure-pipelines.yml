@@ -4,52 +4,31 @@ trigger:
       - master  # Trigger the pipeline on commits to the master branch
 
 pool:
-  vmImage: 'windows-latest'
+  vmImage: 'ubuntu-latest'  # You can also use 'windows-latest' if you prefer Windows agents
 
 variables:
   buildConfiguration: 'Release'
-  dotnetVersion: '8.x' # .NET 8 SDK version
 
 steps:
-- task: UseDotNet@2
+# Step to copy static website files (HTML, CSS, JS) to the artifact staging directory
+- task: CopyFiles@2
   inputs:
-    packageType: 'sdk'
-    version: '$(dotnetVersion)'
-    includePreviewVersions: true
+    SourceFolder: '$(Build.SourcesDirectory)'  # Path to the repository
+    Contents: '**/*'  # Include all files (HTML, CSS, JS, etc.)
+    TargetFolder: '$(Build.ArtifactStagingDirectory)'  # The target folder to store files to be published
 
-- task: NuGetToolInstaller@1
-  inputs:
-    versionSpec: '5.8.x'
-
-- task: NuGetCommand@2
-  inputs:
-    command: 'restore'  # Explicitly specify the restore command
-    restoreSolution: true
-    feedsToUse: 'select'
-
-- task: DotNetCoreCLI@2
-  inputs:
-    command: 'build'
-    projects: '**/*.csproj'
-    arguments: '--configuration $(buildConfiguration)'
-
-- task: DotNetCoreCLI@2
-  inputs:
-    command: 'publish'
-    publishWebProjects: true
-    arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
-    zipAfterPublish: true
-
+# Step to publish the artifacts (not necessary if you're just copying raw files, but good practice)
 - task: PublishBuildArtifacts@1
   inputs:
-    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-    ArtifactName: 'drop'
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)'  # The folder with the static website files
+    ArtifactName: 'drop'  # The artifact name for publishing
     publishLocation: 'Container'
 
+# Step to deploy the static website files directly to Azure Web App (no zip needed)
 - task: AzureWebApp@1
   inputs:
-    azureSubscription: 'Basic-terraform'
-    appType: 'webApp'
-    appName: 'siarastanley'
-    package: '$(Build.ArtifactStagingDirectory)/**/*.zip'  # Corrected package path
-    deploymentMethod: 'auto'
+    azureSubscription: 'Basic-terraform'  # Your Azure subscription service connection
+    appType: 'webApp'  # Web App type for Azure deployment
+    appName: 'siarastanley'  # The name of your Azure Web App
+    package: '$(Build.ArtifactStagingDirectory)/**/*'  # Path to the files to be deployed (no zip needed)
+    deploymentMethod: 'auto'  # Use automatic deployment method
