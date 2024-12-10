@@ -4,31 +4,36 @@ trigger:
       - master  # Trigger the pipeline on commits to the master branch
 
 pool:
-  vmImage: 'ubuntu-latest'  # You can also use 'windows-latest' if you prefer Windows agents
+  vmImage: 'ubuntu-latest'
 
 variables:
   buildConfiguration: 'Release'
 
 steps:
+# Step to checkout code (if needed)
+- task: Checkout@1
+  displayName: 'Checkout code'
+
 # Step to copy static website files (HTML, CSS, JS) to the artifact staging directory
 - task: CopyFiles@2
   inputs:
-    SourceFolder: '$(Build.SourcesDirectory)'  # Path to the repository
+    SourceFolder: '$(Build.SourcesDirectory)'
     Contents: '**/*'  # Include all files (HTML, CSS, JS, etc.)
-    TargetFolder: '$(Build.ArtifactStagingDirectory)'  # The target folder to store files to be published
+    TargetFolder: '$(Build.ArtifactStagingDirectory)'
 
-# Step to publish the artifacts (not necessary if you're just copying raw files, but good practice)
-- task: PublishBuildArtifacts@1
+# Ensure that files are zipped before deploying (if required)
+- task: DotNetCoreCLI@2
   inputs:
-    PathtoPublish: '$(Build.ArtifactStagingDirectory)'  # The folder with the static website files
-    ArtifactName: 'drop'  # The artifact name for publishing
-    publishLocation: 'Container'
+    command: 'publish'
+    publishWebProjects: true
+    arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
+    zipAfterPublish: true
 
-# Step to deploy the static website files directly to Azure Web App (no zip needed)
+# Step to deploy static files to Azure Web App
 - task: AzureWebApp@1
   inputs:
-    azureSubscription: 'Basic-terraform'  # Your Azure subscription service connection
-    appType: 'webApp'  # Web App type for Azure deployment
-    appName: 'siarastanley'  # The name of your Azure Web App
-    package: '$(Build.ArtifactStagingDirectory)/**/*'  # Path to the files to be deployed (no zip needed)
-    deploymentMethod: 'auto'  # Use automatic deployment method
+    azureSubscription: 'Basic-terraform'
+    appType: 'webApp'
+    appName: 'siarastanley'
+    package: '$(Build.ArtifactStagingDirectory)/drop/**/*.zip'  # Correct package path for zip
+    deploymentMethod: 'auto'
