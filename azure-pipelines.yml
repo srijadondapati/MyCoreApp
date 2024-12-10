@@ -8,31 +8,48 @@ pool:
 
 variables:
   buildConfiguration: 'Release'
+  dotnetVersion: '8.x' # .NET 8 SDK version
 
 steps:
-# Checkout the code repository using default behavior
-- checkout: self  # This is the default behavior, ensuring that the pipeline uses the repository it's running in.
-
-# Step to copy static website files (HTML, CSS, JS) to the artifact staging directory
-- task: CopyFiles@2
+- task: UseDotNet@2
   inputs:
-    SourceFolder: '$(Build.SourcesDirectory)'
-    Contents: '**/*'  # Include all files (HTML, CSS, JS, etc.)
-    TargetFolder: '$(Build.ArtifactStagingDirectory)'
+    packageType: 'sdk'
+    version: '$(dotnetVersion)'
+    includePreviewVersions: true
 
-# Optionally, zip the content if required (skip this step if not needed)
-- task: ArchiveFiles@2
+- task: NuGetToolInstaller@1
   inputs:
-    rootFolderOrFile: '$(Build.ArtifactStagingDirectory)'
-    includeRootFolder: false
-    archiveType: 'zip'
-    archiveFile: '$(Build.ArtifactStagingDirectory)/drop/static-site.zip'
+    versionSpec: '5.8.x'
 
-# Step to deploy static files to Azure Web App
+- task: NuGetCommand@2
+  inputs:
+    command: 'restore'  # Explicitly specify the restore command
+    restoreSolution: true
+    feedsToUse: 'select'
+
+- task: DotNetCoreCLI@2
+  inputs:
+    command: 'build'
+    projects: '*/.csproj'
+    arguments: '--configuration $(buildConfiguration)'
+
+- task: DotNetCoreCLI@2
+  inputs:
+    command: 'publish'
+    publishWebProjects: true
+    arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
+    zipAfterPublish: true
+
+- task: PublishBuildArtifacts@1
+  inputs:
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+    ArtifactName: 'drop'
+    publishLocation: 'Container'
+
 - task: AzureWebApp@1
   inputs:
     azureSubscription: 'Basic-terraform'
     appType: 'webApp'
     appName: 'siarastanley'
-    package: '$(Build.ArtifactStagingDirectory)/drop/static-site.zip'  # Using the zip file created
+    package: '$(Build.ArtifactStagingDirectory)/*/.zip'  # Corrected package path
     deploymentMethod: 'auto'
