@@ -1,20 +1,22 @@
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using System;
 
 namespace MyCoreApp.Pages
 {
     public class IndexModel : PageModel
     {
-        private readonly ILogger<IndexModel> _logger;
-
-        public IndexModel(ILogger<IndexModel> logger)
-        {
-            _logger = logger;
-        }
+        public string BirthdayPerson { get; set; }
+        public string Venue { get; set; }
+        public string SpecialGuest { get; set; }
+        public DateTime EventDate { get; set; }
 
         public void OnGet()
         {
-
+            // Assign dynamic values
+            BirthdayPerson = "Mardhal";
+            Venue = "Tatipaka";
+            SpecialGuest = "Rahul Dondapati";
+            EventDate = new DateTime(2024, 12, 28);
         }
     }
 }
