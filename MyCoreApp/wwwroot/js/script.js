@@ -7,9 +7,10 @@ function vote() {
 
     // Change the button to show it's been clicked
     alert("Thank you for voting! We appreciate your response.");
-    document.getElementById('coming-button').innerHTML = "Coming!";
-    document.getElementById('coming-button').style.backgroundColor = "#ddd";
-    document.getElementById('coming-button').style.color = "#333";
-    document.getElementById('coming-button').style.cursor = "not-allowed";
-    document.getElementById('coming-button').disabled = true;
+    const button = document.getElementById('coming-button');
+    button.innerHTML = "Coming!";
+    button.style.backgroundColor = "#ddd";
+    button.style.color = "#333";
+    button.style.cursor = "not-allowed";
+    button.disabled = true;
 }
