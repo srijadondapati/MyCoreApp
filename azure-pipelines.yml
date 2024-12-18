@@ -46,10 +46,4 @@ steps:
     ArtifactName: 'drop'
     publishLocation: 'Container'
 
-- task: AzureWebApp@1
-  inputs:
-    azureSubscription: 'Basic-terraform'
-    appType: 'webApp'
-    appName: 'siarastanley'
-    package: '$(Build.ArtifactStagingDirectory)/*.zip'  # Corrected package path
-    deploymentMethod: 'auto'
+
