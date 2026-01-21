@@ -2,113 +2,104 @@ parameters:
   - name: environmentName
     type: string
 
-steps:
-- task: PowerShell@2
-  displayName: 'Tag work items: ${{ parameters.environmentName }}'
-  inputs:
-    targetType: 'inline'
-    pwsh: true
-    script: |
+jobs:
+- job: Tag_Work_Items
+  displayName: Tag Work Items - ${{ parameters.environmentName }}
+  dependsOn: Build
+  condition: succeeded()
+  steps:
+  - task: PowerShell@2
+    displayName: Update ADO work item tags
+    inputs:
+      targetType: inline
+      pwsh: true
+      script: |
 
-      Write-Host "Starting work item tagging for environment: ${{ parameters.environmentName }}"
+        Write-Host "Starting work item tagging for environment: ${{ parameters.environmentName }}"
 
-      # ==========================
-      # Read variables
-      # ==========================
-      $org     = "$(ADO_ORG)"
-      $project = "$(ADO_PROJECT)"
-      $pat     = "$(ADO_PAT)"
-      $envName = "${{ parameters.environmentName }}"
+        # ==========================
+        # Read variables
+        # ==========================
+        $org     = "$(ADO_ORG)"
+        $project = "$(ADO_PROJECT)"
+        $pat     = "$(ADO_PAT)"
+        $envName = "${{ parameters.environmentName }}"
 
-      if (-not $org -or -not $project -or -not $pat) {
-        Write-Error "Missing required ADO variables (ADO_ORG, ADO_PROJECT, ADO_PAT)"
-        exit 1
-      }
+        if (-not $org -or -not $project -or -not $pat) {
+          Write-Error "Missing required ADO variables"
+          exit 1
+        }
 
-      # ==========================
-      # Auth header
-      # ==========================
-      $base64Auth = [Convert]::ToBase64String(
-        [Text.Encoding]::ASCII.GetBytes(":$pat")
-      )
+        # ==========================
+        # Auth header
+        # ==========================
+        $base64Auth = [Convert]::ToBase64String(
+          [Text.Encoding]::ASCII.GetBytes(":$pat")
+        )
 
-      $authHeader = @{
-        Authorization = "Basic $base64Auth"
-      }
+        $authHeader = @{
+          Authorization = "Basic $base64Auth"
+        }
 
-      # ==========================
-      # Get commit message
-      # ==========================
-      $commitMessage = git log -1 --pretty=%B
-      Write-Host "Commit message: $commitMessage"
+        # ==========================
+        # Read commit message
+        # ==========================
+        $commitMessage = git log -1 --pretty=%B
+        Write-Host "Commit message: $commitMessage"
 
-      # ==========================
-      # Extract work item IDs (AB#123)
-      # ==========================
-      $workItemIds = [regex]::Matches($commitMessage, 'AB#(\d+)') |
-                     ForEach-Object { $_.Groups[1].Value } |
-                     Select-Object -Unique
+        # ==========================
+        # Extract AB#123 IDs
+        # ==========================
+        $workItemIds = [regex]::Matches($commitMessage, 'AB#(\d+)') |
+                       ForEach-Object { $_.Groups[1].Value } |
+                       Select-Object -Unique
 
-      if (-not $workItemIds) {
-        Write-Host "No work item IDs found. Exiting."
-        exit 0
-      }
+        if (-not $workItemIds) {
+          Write-Host "No work item IDs found. Skipping."
+          exit 0
+        }
 
-      # ==========================
-      # Process each work item
-      # ==========================
-      foreach ($id in $workItemIds) {
+        foreach ($id in $workItemIds) {
 
-        Write-Host "Processing Work Item ID: $id"
+          Write-Host "Processing Work Item $id"
 
-        $url = "https://dev.azure.com/$org/$project/_apis/wit/workitems/$id?api-version=7.1-preview.3"
-        Write-Host "GET $url"
+          $url = "https://dev.azure.com/$org/$project/_apis/wit/workitems/$id?api-version=7.1-preview.3"
 
-        try {
           $wi = Invoke-RestMethod `
             -Method Get `
             -Uri $url `
             -Headers $authHeader
-        }
-        catch {
-          Write-Error "Failed to fetch work item $id"
-          throw
-        }
 
-        $existingTags = $wi.fields.'System.Tags'
-        $newTag = "DevOpsDeployed:$envName"
+          $existingTags = $wi.fields.'System.Tags'
+          $newTag = "DevOpsDeployed:$envName"
 
-        if ($existingTags -and $existingTags -like "*$newTag*") {
-          Write-Host "Tag already exists on work item $id"
-          continue
-        }
-
-        if ($existingTags) {
-          $updatedTags = "$existingTags;$newTag"
-        }
-        else {
-          $updatedTags = $newTag
-        }
-
-        $patchBody = @(
-          @{
-            op    = "add"
-            path  = "/fields/System.Tags"
-            value = $updatedTags
+          if ($existingTags -and $existingTags -like "*$newTag*") {
+            Write-Host "Tag already exists for $id"
+            continue
           }
-        ) | ConvertTo-Json -Depth 5
 
-        Write-Host "PATCH $url"
-        Write-Host "Adding tag: $newTag"
+          $updatedTags = if ($existingTags) {
+            "$existingTags;$newTag"
+          } else {
+            $newTag
+          }
 
-        Invoke-RestMethod `
-          -Method Patch `
-          -Uri $url `
-          -Headers @{
-            Authorization = $authHeader.Authorization
-            "Content-Type" = "application/json-patch+json"
-          } `
-          -Body $patchBody
+          $patchBody = @(
+            @{
+              op    = "add"
+              path  = "/fields/System.Tags"
+              value = $updatedTags
+            }
+          ) | ConvertTo-Json -Depth 5
 
-        Write-Host "Successfully updated work item $id"
-      }
+          Invoke-RestMethod `
+            -Method Patch `
+            -Uri $url `
+            -Headers @{
+              Authorization = $authHeader.Authorization
+              "Content-Type" = "application/json-patch+json"
+            } `
+            -Body $patchBody
+
+          Write-Host "Updated work item $id"
+        }
