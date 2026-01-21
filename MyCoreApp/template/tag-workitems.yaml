@@ -65,10 +65,16 @@ jobs:
 
           $url = "https://dev.azure.com/$org/$project/_apis/wit/workitems/$id?api-version=7.1-preview.3"
 
-          $wi = Invoke-RestMethod `
-            -Method Get `
-            -Uri $url `
-            -Headers $authHeader
+          try {
+            $wi = Invoke-RestMethod `
+              -Method Get `
+              -Uri $url `
+              -Headers $authHeader
+          }
+          catch {
+            Write-Error "Failed to fetch work item $id"
+            throw
+          }
 
           $existingTags = $wi.fields.'System.Tags'
           $newTag = "DevOpsDeployed:$envName"
