@@ -15,114 +15,100 @@ jobs:
       $project = "$(ADO_PROJECT)"
       $envTag = "DevOpsDeployed:${{ parameters.environmentName }}"
       
-      Write-Host "=========================================="
-      Write-Host "Azure DevOps Work Item Tag Update"
-      Write-Host "=========================================="
-      Write-Host "Environment Tag: $envTag"
-      Write-Host "Organization: $org"
+      Write-Host "Environment: ${{ parameters.environmentName }}"
+      Write-Host "Tag: $envTag"
+      Write-Host "Org: $org"
       Write-Host "Project: $project"
 
       $pat = "$(ADO_PAT)"
       if ([string]::IsNullOrWhiteSpace($pat)) {
-        throw "ADO_PAT is missing. Please check your variable group 'workitem-tagging-secrets'."
+        throw "ADO_PAT is missing"
       }
 
       # Auth header
-      $basicAuth = [Convert]::ToBase64String(
-        [Text.Encoding]::ASCII.GetBytes(":$pat")
-      )
+      $basicAuth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$pat"))
 
-      # Extract Work Item IDs from commit message
+      # Extract Work Item IDs
       $commitMsg = "$(Build.SourceVersionMessage)"
-      Write-Host "Commit Message: $commitMsg"
+      Write-Host "Commit: $commitMsg"
       
       $ids = [regex]::Matches($commitMsg, 'AB#(\d+)') |
              ForEach-Object { $_.Groups[1].Value } |
              Select-Object -Unique
 
-      Write-Host "Found work item IDs: $($ids -join ', ')"
+      Write-Host "Found IDs: $($ids -join ', ')"
 
       if ($ids.Count -eq 0) {
-        Write-Host "No work items found. Skipping."
+        Write-Host "No work items found"
         exit 0
       }
 
-      $successCount = 0
-      $failureCount = 0
-      
       foreach ($id in $ids) {
         Write-Host ""
-        Write-Host "➡️ Processing Work Item ID: $id"
-        Write-Host "----------------------------------------"
+        Write-Host "Processing ID: $id"
+        
+        $url = "https://dev.azure.com/$org/$project/_apis/wit/workitems/$($id)?api-version=7.1-preview.3"
         
         try {
-          # Construct URL
-          $url = "https://dev.azure.com/$org/$project/_apis/wit/workitems/$($id)?api-version=7.1-preview.3"
-          Write-Host "API URL: $url"
-          
-          # Read existing work item
+          # Get current work item
           $wi = Invoke-RestMethod -Method Get -Uri $url -Headers @{
             Authorization = "Basic $basicAuth"
           }
 
-          $wiTitle = $wi.fields.'System.Title'
-          $existingTags = $wi.fields.'System.Tags'
-          if (-not $existingTags) { $existingTags = "" }
+          $title = $wi.fields.'System.Title'
+          $currentTags = $wi.fields.'System.Tags'
+          if (-not $currentTags) { $currentTags = "" }
 
-          Write-Host "Title: $wiTitle"
-          Write-Host "Current Tags: '$existingTags'"
+          Write-Host "Title: $title"
+          Write-Host "Current Tags: $currentTags"
           
-          # Check if already has this tag
-          if ($existingTags -match [regex]::Escape($envTag)) { 
-            Write-Host "✅ Already tagged with: $envTag"
-            $successCount++
+          # Check if tag already exists
+          if ($currentTags -match [regex]::Escape($envTag)) { 
+            Write-Host "Already has tag: $envTag"
             continue 
           }
 
-          # METHOD 1: Try using simple "add" operation (just add the new tag)
-          Write-Host "Attempting to add tag using 'add' operation..."
+          # Build new tags
+          if ([string]::IsNullOrWhiteSpace($currentTags)) {
+            $newTags = $envTag
+          } else {
+            $newTags = "$currentTags; $envTag"
+          }
+
+          Write-Host "New Tags: $newTags"
+
+          # CORRECT JSON FORMAT for Azure DevOps PATCH
+          # This is the key fix - using proper JSON array format
+          $patchDocument = @"
+[
+  {
+    "op": "replace",
+    "path": "/fields/System.Tags",
+    "value": "$newTags"
+  }
+]
+"@
+
+          Write-Host "Patch Document: $patchDocument"
           
-          # Create the update payload - JUST add the new tag
-          $updatePayload = @(
-            @{
-              op = "add"
-              path = "/fields/System.Tags"
-              value = $envTag
-            }
-          )
-          
-          # Convert to JSON with proper depth
-          $body = $updatePayload | ConvertTo-Json -Depth 3
-          Write-Host "Request Body: $body"
-          
-          Write-Host "Sending PATCH request..."
+          # Update work item
           $response = Invoke-RestMethod -Method Patch -Uri $url -Headers @{
             Authorization  = "Basic $basicAuth"
             "Content-Type" = "application/json-patch+json"
-          } -Body $body
+          } -Body $patchDocument
           
-          Write-Host "✅ Successfully added tag to Work Item $id"
-          Write-Host "   Title: $wiTitle"
-          Write-Host "   Added Tag: $envTag"
-          $successCount++
+          Write-Host "✅ Updated: $title"
+          Write-Host "   New Tags: $($response.fields.'System.Tags')"
           
         } catch {
-          Write-Host "❌ Error updating Work Item $id"
-          Write-Host "   Error Message: $($_.Exception.Message)"
+          Write-Host "❌ Error: $($_.Exception.Message)"
           
-          # Try METHOD 2: Use "replace" operation if "add" fails
-          Write-Host "Trying 'replace' operation as fallback..."
+          # Alternative method - try different JSON format
+          Write-Host "Trying alternative JSON format..."
           
           try {
-            # Calculate new tags string
-            if ([string]::IsNullOrWhiteSpace($existingTags)) {
-              $newTags = $envTag
-            } else {
-              $newTags = "$existingTags; $envTag"
-            }
-            
-            # Create replace payload
-            $updatePayload = @(
+            # Alternative: Use hashtable and ConvertTo-Json
+            $patchData = @(
               @{
                 op = "replace"
                 path = "/fields/System.Tags"
@@ -130,50 +116,19 @@ jobs:
               }
             )
             
-            $body = $updatePayload | ConvertTo-Json -Depth 3
-            Write-Host "Replace Request Body: $body"
+            $body = $patchData | ConvertTo-Json -Compress
+            Write-Host "Alternative Body: $body"
             
             $response = Invoke-RestMethod -Method Patch -Uri $url -Headers @{
               Authorization  = "Basic $basicAuth"
               "Content-Type" = "application/json-patch+json"
             } -Body $body
             
-            Write-Host "✅ Successfully updated tags using 'replace' operation"
-            Write-Host "   Work Item: $wiTitle"
-            Write-Host "   New Tags: $newTags"
-            $successCount++
+            Write-Host "✅ Updated with alternative format"
             
           } catch {
-            Write-Host "❌ Both 'add' and 'replace' operations failed"
-            Write-Host "   Final Error: $($_.Exception.Message)"
-            
-            # Try to read the response for more details
-            try {
-              if ($_.Exception.Response) {
-                $stream = $_.Exception.Response.GetResponseStream()
-                $stream.Position = 0
-                $reader = New-Object System.IO.StreamReader($stream)
-                $responseBody = $reader.ReadToEnd()
-                Write-Host "   Response Body: $responseBody"
-              }
-            } catch {
-              Write-Host "   Could not read response body"
-            }
-            
-            $failureCount++
+            Write-Host "❌ Both methods failed"
           }
         }
-      }
-      
-      Write-Host ""
-      Write-Host "=========================================="
-      Write-Host "Update Summary:"
-      Write-Host "✅ Successfully updated: $successCount"
-      Write-Host "❌ Failed: $failureCount"
-      Write-Host "Total processed: $($ids.Count)"
-      Write-Host "=========================================="
-      
-      if ($failureCount -gt 0) {
-        Write-Host "##vso[task.logissue type=warning]Some work items failed to update"
       }
     displayName: 'Update Azure DevOps Work Item Tags'
