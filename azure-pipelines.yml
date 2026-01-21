@@ -53,6 +53,6 @@ jobs:
       ArtifactName: 'drop'
       publishLocation: 'Container'
 
-- template: template/tag-workitems.yaml
+- template: MyCoreApp/template/tag-workitems.yaml
   parameters:
     environmentName: BUILD
