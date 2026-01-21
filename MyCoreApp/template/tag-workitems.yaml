@@ -1,109 +1,102 @@
-# template/tag-workitems.yaml
 parameters:
 - name: environmentName
   type: string
 
-steps:
-- task: PowerShell@2
-  displayName: Tag ADO work items (${{ parameters.environmentName }})
-  inputs:
-    targetType: inline
-    pwsh: true
-    script: |
-      Write-Host "Starting work item tagging for environment: ${{ parameters.environmentName }}"
+# Name of the deployment job in the SAME stage (e.g., DeployDEV / DeployQA)
+#- name: dependsOnJob
+#  type: string
 
-      # ==========================
-      # Read variables
-      # ==========================
-      $org     = "$(ADO_ORG)"
-      $project = "$(ADO_PROJECT)"
-      $pat     = "$(ADO_PAT)"
-      $envName = "${{ parameters.environmentName }}"
+jobs:
+- job: Tag_Work_Items_${{ parameters.environmentName }}
+  displayName: Tag Work Items - ${{ parameters.environmentName }}
 
-      if ([string]::IsNullOrWhiteSpace($org) -or [string]::IsNullOrWhiteSpace($project) -or [string]::IsNullOrWhiteSpace($pat)) {
-        Write-Error "Missing required ADO variables (ADO_ORG / ADO_PROJECT / ADO_PAT)."
-        exit 1
-      }
+  # This is the correct dependency: depend on the ENV deployment job, not Build.
+  dependsOn: ${{ parameters.dependsOnJob }}
 
-      # ==========================
-      # Auth header
-      # ==========================
-      $base64Auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$pat"))
-      $authHeader = @{ Authorization = "Basic $base64Auth" }
+  # Will run only if the deployment job succeeded
+  condition: succeeded()
 
-      # ==========================
-      # Get a reliable commit message range
-      # Prefer the build's source version if available
-      # ==========================
-      $sourceSha = "$(Build.SourceVersion)"
-      if ([string]::IsNullOrWhiteSpace($sourceSha)) {
-        $sourceSha = (git rev-parse HEAD)
-      }
+  steps:
+  - checkout: self
 
-      # Collect messages from the last merge commit / commit
-      # (keeps it simple and works for your current "Merged PR ..: AB#123" pattern)
-      $commitMessage = (git log -1 --pretty=%B $sourceSha)
-      Write-Host "Commit message: $commitMessage"
+  - task: PowerShell@2
+    displayName: Update ADO work item tags
+    inputs:
+      targetType: inline
+      pwsh: true
+      script: |
+        Write-Host "Starting work item tagging for environment: ${{ parameters.environmentName }}"
 
-      # ==========================
-      # Extract AB#123 IDs
-      # ==========================
-      $workItemIds =
-        [regex]::Matches($commitMessage, 'AB#(\d+)') |
-        ForEach-Object { $_.Groups[1].Value } |
-        Select-Object -Unique
+        $org     = "$(ADO_ORG)"
+        $project = "$(ADO_PROJECT)"
+        $pat     = "$(ADO_PAT)"
+        $envName = "${{ parameters.environmentName }}"
 
-      if (-not $workItemIds -or $workItemIds.Count -eq 0) {
-        Write-Host "No work item IDs found in commit message. Skipping."
-        exit 0
-      }
-
-      foreach ($id in $workItemIds) {
-        Write-Host "Processing Work Item $id"
-
-        $url = "https://dev.azure.com/$org/$project/_apis/wit/workitems/$id?api-version=7.1-preview.3"
-
-        try {
-          $wi = Invoke-RestMethod -Method Get -Uri $url -Headers $authHeader -ErrorAction Stop
-        }
-        catch {
-          Write-Error "Failed to fetch work item $id. HTTP call failed. Details: $($_.Exception.Message)"
+        if ([string]::IsNullOrWhiteSpace($org) -or [string]::IsNullOrWhiteSpace($project) -or [string]::IsNullOrWhiteSpace($pat)) {
+          Write-Error "Missing required ADO variables (ADO_ORG / ADO_PROJECT / ADO_PAT)."
           exit 1
         }
 
-        $existingTags = $wi.fields.'System.Tags'
-        $newTag = "DevOpsDeployed:$envName"
+        $base64Auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$pat"))
+        $authHeader = @{ Authorization = "Basic $base64Auth" }
 
-        if ($existingTags -and $existingTags -like "*$newTag*") {
-          Write-Host "Tag already exists on $id: $newTag"
-          continue
+        $commitMessage = git log -1 --pretty=%B
+        Write-Host "Commit message: $commitMessage"
+
+        $workItemIds = [regex]::Matches($commitMessage, 'AB#(\d+)') |
+                       ForEach-Object { $_.Groups[1].Value } |
+                       Select-Object -Unique
+
+        if (-not $workItemIds -or $workItemIds.Count -eq 0) {
+          Write-Host "No work item IDs found. Skipping."
+          exit 0
         }
 
-        $updatedTags = if ($existingTags) { "$existingTags;$newTag" } else { $newTag }
+        foreach ($id in $workItemIds) {
+          Write-Host "Processing Work Item $id"
 
-        $patchBody = @(
-          @{
-            op    = "add"
-            path  = "/fields/System.Tags"
-            value = $updatedTags
+          $url = "https://dev.azure.com/$org/$project/_apis/wit/workitems/$id?api-version=7.1-preview.3"
+          Write-Host "GET: $url"
+
+          try {
+            $wi = Invoke-RestMethod -Method Get -Uri $url -Headers $authHeader -ErrorAction Stop
+          } catch {
+            Write-Error "Failed to fetch work item $id. Check ADO_ORG/ADO_PROJECT and PAT scope. Details: $($_.Exception.Message)"
+            exit 1
           }
-        ) | ConvertTo-Json -Depth 5
 
-        try {
-          Invoke-RestMethod `
-            -Method Patch `
-            -Uri $url `
-            -Headers @{
-              Authorization  = $authHeader.Authorization
-              "Content-Type" = "application/json-patch+json"
-            } `
-            -Body $patchBody `
-            -ErrorAction Stop
-        }
-        catch {
-          Write-Error "Failed to update work item $id. Details: $($_.Exception.Message)"
-          exit 1
-        }
+          $existingTags = $wi.fields.'System.Tags'
+          $newTag = "DevOpsDeployed:$envName"
 
-        Write-Host "Updated work item $id with tag: $newTag"
-      }
+          if ($existingTags -and $existingTags -like "*$newTag*") {
+            Write-Host "Tag already exists for $id"
+            continue
+          }
+
+          $updatedTags = if ($existingTags) { "$existingTags;$newTag" } else { $newTag }
+
+          $patchBody = @(
+            @{
+              op    = "add"
+              path  = "/fields/System.Tags"
+              value = $updatedTags
+            }
+          ) | ConvertTo-Json -Depth 5
+
+          try {
+            Invoke-RestMethod `
+              -Method Patch `
+              -Uri $url `
+              -Headers @{
+                Authorization  = $authHeader.Authorization
+                "Content-Type" = "application/json-patch+json"
+              } `
+              -Body $patchBody `
+              -ErrorAction Stop
+          } catch {
+            Write-Error "Failed to update work item $id. Details: $($_.Exception.Message)"
+            exit 1
+          }
+
+          Write-Host "Updated work item $id with tag: $newTag"
+        }
