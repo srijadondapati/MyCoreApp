@@ -1,79 +1,114 @@
 parameters:
-  environmentName: ''
+  - name: environmentName
+    type: string
 
-jobs:
-- job: Tag_Work_Items
+steps:
+- task: PowerShell@2
   displayName: 'Tag work items: ${{ parameters.environmentName }}'
-  pool:
-    vmImage: ubuntu-latest
+  inputs:
+    targetType: 'inline'
+    pwsh: true
+    script: |
 
-  steps:
-  - powershell: |
-      $org = "$(ADO_ORG)"
+      Write-Host "Starting work item tagging for environment: ${{ parameters.environmentName }}"
+
+      # ==========================
+      # Read variables
+      # ==========================
+      $org     = "$(ADO_ORG)"
       $project = "$(ADO_PROJECT)"
-      $envTag = "DevOpsDeployed:${{ parameters.environmentName }}"
+      $pat     = "$(ADO_PAT)"
+      $envName = "${{ parameters.environmentName }}"
 
-      $pat = "$(ADO_PAT)"
-      if ([string]::IsNullOrWhiteSpace($pat)) {
-        throw "ADO_PAT is missing"
+      if (-not $org -or -not $project -or -not $pat) {
+        Write-Error "Missing required ADO variables (ADO_ORG, ADO_PROJECT, ADO_PAT)"
+        exit 1
       }
 
-      Write-Host "ORG=$org PROJECT=$project WORKITEM=$id"
-      Write-Host "URL=https://dev.azure.com/$org/$project/_apis/wit/workitems/$id?api-version=7.1-preview.3"
+      # ==========================
+      # Auth header
+      # ==========================
+      $base64Auth = [Convert]::ToBase64String(
+        [Text.Encoding]::ASCII.GetBytes(":$pat")
+      )
 
+      $authHeader = @{
+        Authorization = "Basic $base64Auth"
+      }
 
-      # Build auth header
-      $basicAuth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$pat"))
-      $authHeader = @{ Authorization = "Basic $basicAuth" }
+      # ==========================
+      # Get commit message
+      # ==========================
+      $commitMessage = git log -1 --pretty=%B
+      Write-Host "Commit message: $commitMessage"
 
-      # Extract Work Item IDs from commit message
-      $commitMsg = "$(Build.SourceVersionMessage)"
-      Write-Host "Commit message: $commitMsg"
+      # ==========================
+      # Extract work item IDs (AB#123)
+      # ==========================
+      $workItemIds = [regex]::Matches($commitMessage, 'AB#(\d+)') |
+                     ForEach-Object { $_.Groups[1].Value } |
+                     Select-Object -Unique
 
-      $ids = [regex]::Matches($commitMsg, 'AB#(\d+)') |
-             ForEach-Object { $_.Groups[1].Value } |
-             Select-Object -Unique
-
-      if ($ids.Count -eq 0) {
-        Write-Host "No work item IDs found. Skipping."
+      if (-not $workItemIds) {
+        Write-Host "No work item IDs found. Exiting."
         exit 0
       }
 
-      foreach ($id in $ids) {
-        Write-Host "Processing Work Item $id"
+      # ==========================
+      # Process each work item
+      # ==========================
+      foreach ($id in $workItemIds) {
+
+        Write-Host "Processing Work Item ID: $id"
 
         $url = "https://dev.azure.com/$org/$project/_apis/wit/workitems/$id?api-version=7.1-preview.3"
+        Write-Host "GET $url"
 
-        # Get existing tags
-        $wi = Invoke-RestMethod -Method Get -Uri $url -Headers $authHeader
-        $existing = $wi.fields.'System.Tags'
-        if (-not $existing) { $existing = "" }
+        try {
+          $wi = Invoke-RestMethod `
+            -Method Get `
+            -Uri $url `
+            -Headers $authHeader
+        }
+        catch {
+          Write-Error "Failed to fetch work item $id"
+          throw
+        }
 
-        $tags = $existing -split ';' | ForEach-Object { $_.Trim() }
-        if ($tags -contains $envTag) {
-          Write-Host "Tag already exists on $id"
+        $existingTags = $wi.fields.'System.Tags'
+        $newTag = "DevOpsDeployed:$envName"
+
+        if ($existingTags -and $existingTags -like "*$newTag*") {
+          Write-Host "Tag already exists on work item $id"
           continue
         }
 
-        $newTags = if ($existing) { "$existing; $envTag" } else { $envTag }
+        if ($existingTags) {
+          $updatedTags = "$existingTags;$newTag"
+        }
+        else {
+          $updatedTags = $newTag
+        }
 
-        $body = @(
+        $patchBody = @(
           @{
-            op = "add"
-            path = "/fields/System.Tags"
-            value = $newTags
+            op    = "add"
+            path  = "/fields/System.Tags"
+            value = $updatedTags
           }
-        ) | ConvertTo-Json
+        ) | ConvertTo-Json -Depth 5
+
+        Write-Host "PATCH $url"
+        Write-Host "Adding tag: $newTag"
 
         Invoke-RestMethod `
           -Method Patch `
           -Uri $url `
           -Headers @{
-            Authorization  = "Basic $basicAuth"
+            Authorization = $authHeader.Authorization
             "Content-Type" = "application/json-patch+json"
           } `
-          -Body $body
+          -Body $patchBody
 
-        Write-Host "Updated $id with tag $envTag"
+        Write-Host "Successfully updated work item $id"
       }
-    displayName: 'Update ADO work item tags'
