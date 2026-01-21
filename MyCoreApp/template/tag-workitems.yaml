@@ -5,8 +5,6 @@ parameters:
 jobs:
 - job: Tag_Work_Items
   displayName: Tag Work Items - ${{ parameters.environmentName }}
-  dependsOn: Build
-  condition: succeeded()
   steps:
   - task: PowerShell@2
     displayName: Update ADO work item tags
@@ -31,14 +29,15 @@ jobs:
         }
 
         # ==========================
-        # Auth header
+        # Auth header (SINGLE source of truth)
         # ==========================
         $base64Auth = [Convert]::ToBase64String(
           [Text.Encoding]::ASCII.GetBytes(":$pat")
         )
 
-        $authHeader = @{
-          Authorization = "Basic $base64Auth"
+        $headers = @{
+          Authorization  = "Basic $base64Auth"
+          "Content-Type" = "application/json-patch+json"
         }
 
         # ==========================
@@ -69,7 +68,7 @@ jobs:
             $wi = Invoke-RestMethod `
               -Method Get `
               -Uri $url `
-              -Headers $authHeader
+              -Headers $headers
           }
           catch {
             Write-Error "Failed to fetch work item $id"
@@ -101,10 +100,7 @@ jobs:
           Invoke-RestMethod `
             -Method Patch `
             -Uri $url `
-            -Headers @{
-              Authorization = $authHeader.Authorization
-              "Content-Type" = "application/json-patch+json"
-            } `
+            -Headers $headers `
             -Body $patchBody
 
           Write-Host "Updated work item $id"
