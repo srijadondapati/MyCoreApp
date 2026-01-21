@@ -3,8 +3,8 @@ parameters:
   type: string
 
 # Name of the deployment job in the SAME stage (e.g., DeployDEV / DeployQA)
-#- name: dependsOnJob
-#  type: string
+- name: dependsOnJob
+  type: string
 
 jobs:
 - job: Tag_Work_Items_${{ parameters.environmentName }}
