@@ -1,86 +1,135 @@
 parameters:
-  environmentName: ''
+- name: environmentName
+  type: string
 
-jobs:
-- job: Tag_Work_Items
-  displayName: 'Tag work items: ${{ parameters.environmentName }}'
-  pool:
-    vmImage: ubuntu-latest
+steps:
+- task: PowerShell@2
+  displayName: Update ADO work item tags (${{ parameters.environmentName }})
+  inputs:
+    targetType: inline
+    pwsh: true
+    script: |
+      Write-Host "Starting work item tagging for environment: ${{ parameters.environmentName }}"
 
-  steps:
-  - powershell: |
-      $org = "$(ADO_ORG)"
-      $project = "$(ADO_PROJECT)"
-      $envTag = "DevOpsDeployed:${{ parameters.environmentName }}"
-      
-      $pat = "$(ADO_PAT)"
-      if ([string]::IsNullOrWhiteSpace($pat)) {
-        throw "ADO_PAT is missing"
+      # ==========================
+      # Read variables
+      # ==========================
+      $org     = "$(ADO_ORG)".Trim()
+      $pat     = "$(ADO_PAT)".Trim()
+      $envName = "${{ parameters.environmentName }}".Trim()
+
+      if (-not $org -or -not $pat) {
+        Write-Error "Missing required variables. ADO_ORG or ADO_PAT is empty."
+        exit 1
       }
 
-      # Base64 Auth
-      $basicAuth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$pat"))
-      $headers = @{ Authorization = "Basic $basicAuth" }
+      Write-Host "ADO_ORG = '$org'"
+      Write-Host "ENV     = '$envName'"
 
-      # --- LOGIC FIX 1: Use Build API instead of Commit Message ---
-      # This is 100% reliable. Even if PR is squashed, this works.
-      $buildId = "$(Build.BuildId)"
-      $wiApiUrl = "https://dev.azure.com/$org/$project/_apis/build/builds/$buildId/workitems?api-version=7.1"
-      
-      Write-Host "Fetching Work Items for Build ID: $buildId"
-      try {
-        $wiResponse = Invoke-RestMethod -Uri $wiApiUrl -Method Get -Headers $headers
-        $ids = $wiResponse.value.id
-      }
-      catch {
-        Write-Warning "Could not fetch work items from API. Falling back to commit message..."
-        # Fallback to your regex method ONLY if API fails
-        $commitMsg = "$(Build.SourceVersionMessage)"
-        $ids = [regex]::Matches($commitMsg, 'AB#(\d+)') | ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique
+      # ==========================
+      # Auth header (PAT)
+      # ==========================
+      $base64Auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$pat"))
+      $headers = @{
+        Authorization = "Basic $base64Auth"
+        "Content-Type" = "application/json"
       }
 
-      if (-not $ids -or $ids.Count -eq 0) {
+      # ==========================
+      # Read commit message
+      # ==========================
+      $commitMessage = git log -1 --pretty=%B
+      Write-Host "Commit message: $commitMessage"
+
+      # ==========================
+      # Extract AB#123 IDs
+      # ==========================
+      $workItemIds = [regex]::Matches($commitMessage, 'AB#(\d+)') |
+        ForEach-Object { $_.Groups[1].Value } |
+        Select-Object -Unique
+
+      if (-not $workItemIds -or $workItemIds.Count -eq 0) {
         Write-Host "No work item IDs found. Skipping."
         exit 0
       }
 
-      Write-Host "Found IDs: $($ids -join ', ')"
+      # ==========================
+      # Helper: call REST and show real failures
+      # ==========================
+      function Invoke-AdoRest {
+        param(
+          [Parameter(Mandatory=$true)][string]$Method,
+          [Parameter(Mandatory=$true)][string]$Url,
+          [Parameter(Mandatory=$false)][string]$Body
+        )
 
-      foreach ($id in $ids) {
-        Write-Host "Processing Work Item $id" # --- LOGIC FIX 2: Moved inside loop
-        
-        $url = "https://dev.azure.com/$org/$project/_apis/wit/workitems/$id?api-version=7.1"
+        try {
+          if ($Body) {
+            return Invoke-RestMethod -Method $Method -Uri $Url -Headers $headers -Body $Body -ErrorAction Stop
+          } else {
+            return Invoke-RestMethod -Method $Method -Uri $Url -Headers $headers -ErrorAction Stop
+          }
+        }
+        catch {
+          $status = $null
+          $respText = $null
 
-        # Get existing tags
-        $wi = Invoke-RestMethod -Method Get -Uri $url -Headers $headers
-        $existing = $wi.fields.'System.Tags'
-        if (-not $existing) { $existing = "" }
+          if ($_.Exception.Response) {
+            try {
+              $status = [int]$_.Exception.Response.StatusCode
+              $stream = $_.Exception.Response.GetResponseStream()
+              if ($stream) {
+                $reader = New-Object System.IO.StreamReader($stream)
+                $respText = $reader.ReadToEnd()
+              }
+            } catch { }
+          }
 
-        $tags = $existing -split ';' | ForEach-Object { $_.Trim() }
-        if ($tags -contains $envTag) {
-          Write-Host "Tag already exists on $id"
+          Write-Error "REST FAILED: $Method $Url"
+          if ($status)   { Write-Error "HTTP Status: $status" }
+          if ($respText) { Write-Error "Response: $respText" }
+          throw
+        }
+      }
+
+      # ==========================
+      # (Optional) Quick auth sanity check
+      # If this fails with 401/403, PAT/auth is the problem, not the work item.
+      # ==========================
+      $authTestUrl = "https://dev.azure.com/$org/_apis/connectiondata?api-version=7.1"
+      Write-Host "Auth test: $authTestUrl"
+      Invoke-AdoRest -Method Get -Url $authTestUrl | Out-Null
+      Write-Host "Auth test passed."
+
+      foreach ($id in $workItemIds) {
+        Write-Host "Processing Work Item $id"
+
+        # Org-level endpoint (no project). Avoids wrong project segment issues.
+        $wiUrl = "https://dev.azure.com/$org/_apis/wit/workitems/$id?api-version=7.1"
+        Write-Host "GET: $wiUrl"
+
+        $wi = Invoke-AdoRest -Method Get -Url $wiUrl
+
+        $existingTags = $wi.fields.'System.Tags'
+        $newTag = "DevOpsDeployed:$envName"
+
+        if ($existingTags -and $existingTags -like "*$newTag*") {
+          Write-Host "Tag already exists for Work Item $id => $newTag"
           continue
         }
 
-        $newTags = if ($existing) { "$existing; $envTag" } else { $envTag }
+        $updatedTags = if ($existingTags) { "$existingTags;$newTag" } else { $newTag }
 
-        # --- LOGIC FIX 3: Use 'replace' not 'add' ---
-        $body = @(
+        $patchBody = @(
           @{
-            op = "replace" # <--- CHANGED FROM 'add'
+            op   = "add"
             path = "/fields/System.Tags"
-            value = $newTags
+            value = $updatedTags
           }
-        ) | ConvertTo-Json
+        ) | ConvertTo-Json -Depth 5
 
-        Invoke-RestMethod `
-          -Method Patch `
-          -Uri $url `
-          -Headers $headers `
-          -Body $body `
-          -ContentType "application/json-patch+json"
+        Write-Host "PATCH: $wiUrl"
+        Invoke-AdoRest -Method Patch -Url $wiUrl -Body $patchBody | Out-Null
 
-        Write-Host "Updated $id with tag $envTag"
+        Write-Host "Updated Work Item $id with tag: $newTag"
       }
-    displayName: 'Update ADO work item tags'
-    continueOnError: true # Don't fail pipeline if tagging fails
