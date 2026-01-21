@@ -21,7 +21,7 @@ jobs:
 
       $pat = "$(ADO_PAT)"
       if ([string]::IsNullOrWhiteSpace($pat)) {
-        throw "ADO_PAT is missing"
+        throw "ADO_PAT is missing. Please check your variable group 'workitem-tagging-secrets'."
       }
 
       # Auth header
@@ -31,9 +31,13 @@ jobs:
 
       # Extract Work Item IDs from commit message
       $commitMsg = "$(Build.SourceVersionMessage)"
+      Write-Host "Commit Message: $commitMsg"
+      
       $ids = [regex]::Matches($commitMsg, 'AB#(\d+)') |
              ForEach-Object { $_.Groups[1].Value } |
              Select-Object -Unique
+
+      Write-Host "Found work item IDs: $($ids -join ', ')"
 
       if ($ids.Count -eq 0) {
         Write-Host "No work items found. Skipping."
@@ -41,33 +45,50 @@ jobs:
       }
 
       foreach ($id in $ids) {
-        $url = "https://dev.azure.com/$org/$project/_apis/wit/workitems/$id?api-version=7.1-preview.3"
-
-        # Read existing tags
-        $wi = Invoke-RestMethod -Method Get -Uri $url -Headers @{
-          Authorization = "Basic $basicAuth"
-        }
-
-        $existing = $wi.fields.'System.Tags'
-        if (-not $existing) { $existing = "" }
-
-        $tagList = $existing -split ';' | ForEach-Object { $_.Trim() }
-        if ($tagList -contains $envTag) { 
-          Write-Host "Work Item $id already has tag: $envTag"
-          continue 
-        }
-
-        $newTags = if ($existing) { "$existing; $envTag" } else { $envTag }
-
-        $body = @(
-          @{ op = "add"; path = "/fields/System.Tags"; value = $newTags }
-        ) | ConvertTo-Json
-
-        Invoke-RestMethod -Method Patch -Uri $url -Headers @{
-          Authorization  = "Basic $basicAuth"
-          "Content-Type" = "application/json-patch+json"
-        } -Body $body
+        Write-Host ""
+        Write-Host "Processing Work Item ID: $id"
         
-        Write-Host "✅ Updated Work Item $id with tag: $envTag"
+        # Construct URL correctly
+        $url = "https://dev.azure.com/$org/$project/_apis/wit/workitems/$($id)?api-version=7.1-preview.3"
+        Write-Host "API URL: $url"
+        
+        try {
+          # Read existing tags
+          Write-Host "Fetching work item details..."
+          $wi = Invoke-RestMethod -Method Get -Uri $url -Headers @{
+            Authorization = "Basic $basicAuth"
+          }
+
+          $existing = $wi.fields.'System.Tags'
+          if (-not $existing) { $existing = "" }
+
+          Write-Host "Current Tags: $existing"
+          
+          $tagList = $existing -split ';' | ForEach-Object { $_.Trim() }
+          if ($tagList -contains $envTag) { 
+            Write-Host "Work Item $id already has tag: $envTag"
+            continue 
+          }
+
+          $newTags = if ($existing) { "$existing; $envTag" } else { $envTag }
+          Write-Host "New Tags: $newTags"
+
+          $body = @(
+            @{ op = "add"; path = "/fields/System.Tags"; value = $newTags }
+          ) | ConvertTo-Json
+
+          Write-Host "Updating work item..."
+          $response = Invoke-RestMethod -Method Patch -Uri $url -Headers @{
+            Authorization  = "Basic $basicAuth"
+            "Content-Type" = "application/json-patch+json"
+          } -Body $body
+          
+          Write-Host "✅ Successfully updated Work Item $id with tag: $envTag"
+          
+        } catch {
+          Write-Host "❌ Error updating Work Item $id"
+          Write-Host "Error Details: $_"
+          Write-Host "Full Error: $($_.Exception.Message)"
+        }
       }
     displayName: 'Update Azure DevOps Work Item Tags'
