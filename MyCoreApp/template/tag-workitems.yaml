@@ -1,0 +1,75 @@
+parameters:
+  environmentName: ''
+
+jobs:
+- job: Tag_Work_Items
+  displayName: 'Tag work items: ${{ parameters.environmentName }}'
+  pool:
+    vmImage: ubuntu-latest
+
+  steps:
+  - powershell: |
+      $org = "$(ADO_ORG)"
+      $project = "$(ADO_PROJECT)"
+      $envTag = "DevOpsDeployed:${{ parameters.environmentName }}"
+
+      $pat = "$(ADO_PAT)"
+      if ([string]::IsNullOrWhiteSpace($pat)) {
+        throw "ADO_PAT is missing"
+      }
+
+      # Build auth header
+      $basicAuth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$pat"))
+      $authHeader = @{ Authorization = "Basic $basicAuth" }
+
+      # Extract Work Item IDs from commit message
+      $commitMsg = "$(Build.SourceVersionMessage)"
+      Write-Host "Commit message: $commitMsg"
+
+      $ids = [regex]::Matches($commitMsg, 'AB#(\d+)') |
+             ForEach-Object { $_.Groups[1].Value } |
+             Select-Object -Unique
+
+      if ($ids.Count -eq 0) {
+        Write-Host "No work item IDs found. Skipping."
+        exit 0
+      }
+
+      foreach ($id in $ids) {
+        Write-Host "Processing Work Item $id"
+
+        $url = "https://dev.azure.com/$org/$project/_apis/wit/workitems/$id?api-version=7.1-preview.3"
+
+        # Get existing tags
+        $wi = Invoke-RestMethod -Method Get -Uri $url -Headers $authHeader
+        $existing = $wi.fields.'System.Tags'
+        if (-not $existing) { $existing = "" }
+
+        $tags = $existing -split ';' | ForEach-Object { $_.Trim() }
+        if ($tags -contains $envTag) {
+          Write-Host "Tag already exists on $id"
+          continue
+        }
+
+        $newTags = if ($existing) { "$existing; $envTag" } else { $envTag }
+
+        $body = @(
+          @{
+            op = "add"
+            path = "/fields/System.Tags"
+            value = $newTags
+          }
+        ) | ConvertTo-Json
+
+        Invoke-RestMethod `
+          -Method Patch `
+          -Uri $url `
+          -Headers @{
+            Authorization  = "Basic $basicAuth"
+            "Content-Type" = "application/json-patch+json"
+          } `
+          -Body $body
+
+        Write-Host "Updated $id with tag $envTag"
+      }
+    displayName: 'Update ADO work item tags'
