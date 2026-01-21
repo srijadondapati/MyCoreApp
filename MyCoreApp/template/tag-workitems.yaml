@@ -18,6 +18,10 @@ jobs:
         throw "ADO_PAT is missing"
       }
 
+      Write-Host "ORG=$org PROJECT=$project WORKITEM=$id"
+      Write-Host "URL=https://dev.azure.com/$org/$project/_apis/wit/workitems/$id?api-version=7.1-preview.3"
+
+
       # Build auth header
       $basicAuth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$pat"))
       $authHeader = @{ Authorization = "Basic $basicAuth" }
