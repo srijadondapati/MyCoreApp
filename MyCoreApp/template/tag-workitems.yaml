@@ -1,117 +1,409 @@
 parameters:
 - name: environmentName
   type: string
-
+  default: 'BUILD'
 - name: dependsOnJob
   type: string
+  default: ''
+- name: workItemPattern
+  type: string
+  default: 'AB#(\d+)'
+- name: sourceType
+  type: string
+  default: 'commit'
+  values:
+    - commit
+    - pr
+    - manual
+- name: customWorkItemIds
+  type: string
+  default: ''
+- name: addDeploymentComment
+  type: boolean
+  default: true
 
 jobs:
-- job: Tag_Work_Items_${{ parameters.environmentName }}
-  displayName: Tag Work Items - ${{ parameters.environmentName }}
+- job: Tag_Work_Items
+  displayName: 'Tag work items: ${{ parameters.environmentName }}'
   dependsOn: ${{ parameters.dependsOnJob }}
-  condition: succeeded()
+  pool:
+    vmImage: ubuntu-latest
+  
+  variables:
+    adoOrg: $(ADO_ORG)
+    adoProject: $(ADO_PROJECT)
+    adoPat: $(ADO_PAT)
+    envTag: 'DevOpsDeployed:${{ parameters.environmentName }}'
+    buildId: $(Build.BuildId)
+    buildUrl: $(Build.BuildUri)
+    repoName: $(Build.Repository.Name)
+    branchName: $(Build.SourceBranchName)
+    commitId: $(Build.SourceVersion)
+    commitMessage: $(Build.SourceVersionMessage)
+    prId: $(System.PullRequest.PullRequestId)
+    prNumber: $(System.PullRequest.PullRequestNumber)
 
   steps:
-  - checkout: self
+  - task: PowerShell@2
+    displayName: 'Setup and Validate'
+    inputs:
+      targetType: 'inline'
+      script: |
+        Write-Host "=========================================="
+        Write-Host "Azure DevOps Work Item Tag Update"
+        Write-Host "=========================================="
+        Write-Host "Environment: ${{ parameters.environmentName }}"
+        Write-Host "Environment Tag: $(envTag)"
+        Write-Host "Organization: $(adoOrg)"
+        Write-Host "Project: $(adoProject)"
+        Write-Host "Build ID: $(buildId)"
+        Write-Host "Repository: $(repoName)"
+        Write-Host "Branch: $(branchName)"
+        Write-Host "Commit: $(commitId)"
+        Write-Host "Source Type: ${{ parameters.sourceType }}"
+        Write-Host "=========================================="
+        
+        # Validate required parameters
+        if ([string]::IsNullOrWhiteSpace("$(adoPat)")) {
+          throw "ADO_PAT variable is not set. Please check your variable group 'workitem-tagging-secrets'."
+        }
+        
+        if ([string]::IsNullOrWhiteSpace("$(adoOrg)")) {
+          throw "ADO_ORG variable is not set. Please check your variable group 'workitem-tagging-secrets'."
+        }
+        
+        if ([string]::IsNullOrWhiteSpace("$(adoProject)")) {
+          throw "ADO_PROJECT variable is not set. Please check your variable group 'workitem-tagging-secrets'."
+        }
+        
+        Write-Host "✅ All required parameters are valid"
+        
+        # Create auth header
+        $basicAuth = [Convert]::ToBase64String(
+          [Text.Encoding]::ASCII.GetBytes(":$(adoPat)")
+        )
+        
+        # Store in variable for other steps
+        Write-Host "##vso[task.setvariable variable=BASIC_AUTH]$basicAuth"
 
   - task: PowerShell@2
-    displayName: Update ADO work item tags
+    displayName: 'Extract Work Item IDs'
     inputs:
-      targetType: inline
-      pwsh: true
+      targetType: 'inline'
       script: |
-        Write-Host "Starting work item tagging for environment: ${{ parameters.environmentName }}"
-
-        # ==========================
-        # Read variables
-        # ==========================
-        $org     = "$(ADO_ORG)"       # Example: ProjectSR   (ORG name only)
-        $pat     = "$(ADO_PAT)"
-        $envName = "${{ parameters.environmentName }}"
-        $apiVersion = "7.1-preview.3"
-
-        if ([string]::IsNullOrWhiteSpace($org) -or [string]::IsNullOrWhiteSpace($pat)) {
-          Write-Error "Missing required variables: ADO_ORG and/or ADO_PAT."
-          exit 1
+        $workItemIds = @()
+        
+        switch ("${{ parameters.sourceType }}") {
+          "commit" {
+            Write-Host "Extracting from commit message..."
+            $commitMsg = "$(commitMessage)"
+            Write-Host "Commit Message: $commitMsg"
+            
+            $pattern = "${{ parameters.workItemPattern }}"
+            $matches = [regex]::Matches($commitMsg, $pattern)
+            
+            foreach ($match in $matches) {
+              if ($match.Groups.Count -gt 1) {
+                $workItemIds += $match.Groups[1].Value
+              } else {
+                $workItemIds += $match.Value
+              }
+            }
+            
+            Write-Host "Found $($matches.Count) work item references in commit"
+          }
+          
+          "pr" {
+            Write-Host "Extracting from Pull Request..."
+            
+            if ([string]::IsNullOrWhiteSpace("$(prId)")) {
+              Write-Host "No PR ID found. Checking if we can get from API..."
+              
+              # Try to get PR from branch
+              $apiUrl = "https://dev.azure.com/$(adoOrg)/$(adoProject)/_apis/git/repositories/$(repoName)/pullrequests?searchCriteria.sourceRefName=refs/heads/$(branchName)&searchCriteria.status=completed&`$top=1&api-version=7.1-preview.1"
+              
+              try {
+                $response = Invoke-RestMethod -Method Get -Uri $apiUrl -Headers @{
+                  Authorization = "Basic $(BASIC_AUTH)"
+                }
+                
+                if ($response.value.Count -gt 0) {
+                  $pr = $response.value[0]
+                  $prTitle = $pr.title
+                  $prDescription = $pr.description
+                  $content = "$prTitle $prDescription"
+                  
+                  $pattern = "${{ parameters.workItemPattern }}"
+                  $matches = [regex]::Matches($content, $pattern)
+                  
+                  foreach ($match in $matches) {
+                    if ($match.Groups.Count -gt 1) {
+                      $workItemIds += $match.Groups[1].Value
+                    } else {
+                      $workItemIds += $match.Value
+                    }
+                  }
+                  
+                  Write-Host "Found $($matches.Count) work items in PR: $($pr.pullRequestId)"
+                }
+              } catch {
+                Write-Host "Could not fetch PR details: $_"
+              }
+            } else {
+              # Get PR details using PR ID
+              $apiUrl = "https://dev.azure.com/$(adoOrg)/$(adoProject)/_apis/git/pullrequests/$(prId)?api-version=7.1-preview.1"
+              
+              try {
+                $pr = Invoke-RestMethod -Method Get -Uri $apiUrl -Headers @{
+                  Authorization = "Basic $(BASIC_AUTH)"
+                }
+                
+                $content = "$($pr.title) $($pr.description)"
+                $pattern = "${{ parameters.workItemPattern }}"
+                $matches = [regex]::Matches($content, $pattern)
+                
+                foreach ($match in $matches) {
+                  if ($match.Groups.Count -gt 1) {
+                    $workItemIds += $match.Groups[1].Value
+                  } else {
+                    $workItemIds += $match.Value
+                  }
+                }
+                
+                Write-Host "Found $($matches.Count) work items in PR: $(prId)"
+              } catch {
+                Write-Host "Could not fetch PR details: $_"
+              }
+            }
+          }
+          
+          "manual" {
+            Write-Host "Using manually provided work item IDs..."
+            $customIds = "${{ parameters.customWorkItemIds }}"
+            
+            if (-not [string]::IsNullOrWhiteSpace($customIds)) {
+              $workItemIds = $customIds -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ -match '^\d+$' }
+              Write-Host "Found $($workItemIds.Count) manually specified work items"
+            }
+          }
+        }
+        
+        # Remove duplicates
+        $uniqueIds = $workItemIds | Select-Object -Unique
+        
+        if ($uniqueIds.Count -eq 0) {
+          Write-Host "⚠️ No work items found to update"
+          Write-Host "##vso[task.setvariable variable=HAS_WORK_ITEMS]false"
+          Write-Host "##vso[task.setvariable variable=WORK_ITEM_COUNT]0"
+          Write-Host "##vso[task.setvariable variable=WORK_ITEM_IDS]"
+        } else {
+          Write-Host "✅ Found $($uniqueIds.Count) unique work items:"
+          $uniqueIds | ForEach-Object { Write-Host "  - $_" }
+          
+          Write-Host "##vso[task.setvariable variable=HAS_WORK_ITEMS]true"
+          Write-Host "##vso[task.setvariable variable=WORK_ITEM_COUNT]$($uniqueIds.Count)"
+          Write-Host "##vso[task.setvariable variable=WORK_ITEM_IDS]$($uniqueIds -join ',')"
         }
 
-        # ==========================
-        # Auth header (PAT)
-        # ==========================
-        $base64Auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$pat"))
-        $authHeader = @{ Authorization = "Basic $base64Auth" }
+  - task: PowerShell@2
+    displayName: 'Update Work Item Tags'
+    condition: and(succeeded(), eq(variables['HAS_WORK_ITEMS'], 'true'))
+    inputs:
+      targetType: 'inline'
+      script: |
+        $workItemIds = "$(WORK_ITEM_IDS)" -split ',' | ForEach-Object { $_.Trim() }
+        $successCount = 0
+        $failureCount = 0
+        $skippedCount = 0
+        
+        Write-Host "Starting update of $($workItemIds.Count) work items..."
+        Write-Host "Environment Tag: $(envTag)"
+        Write-Host "Note: Previous environment tags will NOT be removed"
+        
+        foreach ($id in $workItemIds) {
+          Write-Host ""
+          Write-Host "➡️ Processing Work Item: $id"
+          Write-Host "----------------------------------------"
+          
+          try {
+            # Get work item details
+            $url = "https://dev.azure.com/$(adoOrg)/$(adoProject)/_apis/wit/workitems/$($id)?api-version=7.1-preview.3"
+            
+            $wi = Invoke-RestMethod -Method Get -Uri $url -Headers @{
+              Authorization = "Basic $(BASIC_AUTH)"
+            }
+            
+            $wiTitle = $wi.fields.'System.Title'
+            $wiType = $wi.fields.'System.WorkItemType'
+            $existingTags = $wi.fields.'System.Tags'
+            
+            if (-not $existingTags) { $existingTags = "" }
+            
+            Write-Host "Title: $wiTitle"
+            Write-Host "Type: $wiType"
+            Write-Host "Current Tags: $existingTags"
+            
+            # Check if already has this environment tag
+            if ($existingTags -match [regex]::Escape("$(envTag)")) {
+              Write-Host "✅ Already tagged with $(envTag). Skipping."
+              $skippedCount++
+              continue
+            }
+            
+            # Process tags - DO NOT remove previous DevOpsDeployed tags
+            $tagList = @()
+            if (-not [string]::IsNullOrWhiteSpace($existingTags)) {
+              $tagList = $existingTags -split ';' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+            }
+            
+            # Add new environment tag
+            $tagList += "$(envTag)"
+            
+            # Remove any duplicates and empty entries
+            $newTags = ($tagList | Select-Object -Unique | Where-Object { $_ }) -join '; '
+            
+            Write-Host "New Tags: $newTags"
+            
+            # Prepare update payload
+            $updatePayload = @()
+            
+            # Update tags
+            $updatePayload += @{
+              op = "replace"
+              path = "/fields/System.Tags"
+              value = $newTags
+            }
+            
+            # Add deployment comment if configured
+            if (${{ parameters.addDeploymentComment }}) {
+              $comment = @"
+Deployed to ${{ parameters.environmentName }} environment
+- Build: $(buildId)
+- Branch: $(branchName)
+- Commit: $(commitId)
+- Date: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+              
+[View Build]($(buildUrl))
+"@
+              
+              $updatePayload += @{
+                op = "add"
+                path = "/fields/System.History"
+                value = $comment
+              }
+            }
+            
+            $body = $updatePayload | ConvertTo-Json -Depth 10
+            
+            # Update work item
+            $response = Invoke-RestMethod -Method Patch -Uri $url -Headers @{
+              Authorization = "Basic $(BASIC_AUTH)"
+              "Content-Type" = "application/json-patch+json"
+            } -Body $body
+            
+            Write-Host "✅ Successfully updated Work Item $id"
+            $successCount++
+            
+          } catch {
+            Write-Host "❌ Failed to update Work Item $id"
+            Write-Host "Error: $_"
+            $failureCount++
+          }
+        }
+        
+        Write-Host ""
+        Write-Host "=========================================="
+        Write-Host "Update Summary:"
+        Write-Host "✅ Success: $successCount"
+        Write-Host "❌ Failed: $failureCount"
+        Write-Host "⚠️ Skipped (already tagged): $skippedCount"
+        Write-Host "Total Processed: $(WORK_ITEM_COUNT)"
+        Write-Host "=========================================="
+        
+        # Set output variables
+        Write-Host "##vso[task.setvariable variable=UPDATE_SUCCESS_COUNT]$successCount"
+        Write-Host "##vso[task.setvariable variable=UPDATE_FAILURE_COUNT]$failureCount"
+        Write-Host "##vso[task.setvariable variable=UPDATE_SKIPPED_COUNT]$skippedCount"
 
-        # ==========================
-        # Read commit message
-        # ==========================
-        $commitMessage = git log -1 --pretty=%B
-        Write-Host "Commit message: $commitMessage"
-
-        # ==========================
-        # Extract AB#123 IDs
-        # ==========================
-        $workItemIds =
-          [regex]::Matches($commitMessage, 'AB#(\d+)') |
-          ForEach-Object { $_.Groups[1].Value } |
-          Where-Object { $_ -match '^\d+$' } |
-          Select-Object -Unique
-
-        if (-not $workItemIds -or $workItemIds.Count -eq 0) {
-          Write-Host "No work item IDs found. Skipping."
+  - task: PowerShell@2
+    displayName: 'Create Summary Report'
+    condition: always()
+    inputs:
+      targetType: 'inline'
+      script: |
+        Write-Host "=========================================="
+        Write-Host "Work Item Tag Update - Final Summary"
+        Write-Host "=========================================="
+        
+        $hasWorkItems = "$(HAS_WORK_ITEMS)" -eq "true"
+        
+        if (-not $hasWorkItems) {
+          Write-Host "ℹ️ No work items were found to update."
+          Write-Host "Check that work items are referenced in commit messages using format: AB#12345"
           exit 0
         }
-
-        foreach ($id in $workItemIds) {
-
-          Write-Host "Processing Work Item: [$id]"
-
-          # IMPORTANT:
-          # Use ORG-scoped endpoint (no project segment) to avoid 404 when project name differs.
-          $url = "https://dev.azure.com/$org/_apis/wit/workitems/$($id)?api-version=$apiVersion"
-          Write-Host "GET: $url"
-
-          try {
-            $wi = Invoke-RestMethod -Method Get -Uri $url -Headers $authHeader -ErrorAction Stop
-          } catch {
-            Write-Error "Failed to fetch work item $id. HTTP error: $($_.Exception.Message)"
-            exit 1
-          }
-
-          $existingTags = $wi.fields.'System.Tags'
-          $newTag = "DevOpsDeployed:$envName"
-
-          if ($existingTags -and $existingTags -like "*$newTag*") {
-            Write-Host "Tag already exists for $id: $newTag"
-            continue
-          }
-
-          $updatedTags = if ($existingTags) { "$existingTags;$newTag" } else { $newTag }
-
-          $patchBody = @(
-            @{
-              op    = "add"
-              path  = "/fields/System.Tags"
-              value = $updatedTags
-            }
-          ) | ConvertTo-Json -Depth 5
-
-          Write-Host "PATCH: $url"
-          Write-Host "New Tags: $updatedTags"
-
-          try {
-            Invoke-RestMethod `
-              -Method Patch `
-              -Uri $url `
-              -Headers @{
-                Authorization  = $authHeader.Authorization
-                "Content-Type" = "application/json-patch+json"
-              } `
-              -Body $patchBody `
-              -ErrorAction Stop
-          } catch {
-            Write-Error "Failed to update work item $id. HTTP error: $($_.Exception.Message)"
-            exit 1
-          }
-
-          Write-Host "Updated work item $id with tag: $newTag"
+        
+        $success = [int]"$(UPDATE_SUCCESS_COUNT)"
+        $failure = [int]"$(UPDATE_FAILURE_COUNT)"
+        $skipped = [int]"$(UPDATE_SKIPPED_COUNT)"
+        $total = [int]"$(WORK_ITEM_COUNT)"
+        
+        Write-Host "Environment: ${{ parameters.environmentName }}"
+        Write-Host "Tag Applied: DevOpsDeployed:${{ parameters.environmentName }}"
+        Write-Host ""
+        Write-Host "Results:"
+        Write-Host "  Total Work Items Found: $total"
+        Write-Host "  Successfully Updated: $success"
+        Write-Host "  Failed: $failure"
+        Write-Host "  Skipped (already tagged): $skipped"
+        Write-Host ""
+        
+        if ($failure -gt 0) {
+          Write-Host "⚠️ Some work items failed to update. Check logs above."
         }
+        
+        if ($success -gt 0) {
+          Write-Host "✅ Successfully updated $success work item(s) with deployment tag."
+          Write-Host "   Work items now have tag: DevOpsDeployed:${{ parameters.environmentName }}"
+          Write-Host "   Previous environment tags were NOT removed."
+        }
+        
+        # Create markdown summary for pipeline
+        $summary = @"
+# Work Item Tag Update Summary
+
+## Deployment Information
+- **Environment**: ${{ parameters.environmentName }}
+- **Tag Applied**: `DevOpsDeployed:${{ parameters.environmentName }}`
+- **Build**: [$(buildId)]($(buildUrl))
+- **Branch**: $(branchName)
+- **Repository**: $(repoName)
+
+## Results
+| Status | Count |
+|--------|-------|
+| ✅ Success | $success |
+| ❌ Failed | $failure |
+| ⚠️ Skipped | $skipped |
+| **Total** | **$total** |
+
+## Work Items Processed
+$(if ($(WORK_ITEM_IDS)) {
+  $ids = "$(WORK_ITEM_IDS)" -split ','
+  $links = $ids | ForEach-Object { 
+    "- [Work Item $_](https://dev.azure.com/$(adoOrg)/$(adoProject)/_workitems/edit/$_)"
+  }
+  $links -join "`n"
+} else {
+  "No work items processed"
+})
+
+## Note
+Previous environment tags (DevOpsDeployed:*) were NOT removed. 
+Work items can have multiple deployment tags.
+
+*Last updated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')*
+"@
+        
+        # Write to pipeline summary
+        Write-Host "##vso[task.setvariable variable=UPDATE_SUMMARY]$summary"
