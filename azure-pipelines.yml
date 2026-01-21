@@ -55,5 +55,5 @@ jobs:
 
 - template: MyCoreApp/template/tag-workitems.yaml
   parameters:
-    environmentName: DEV
-    #dependsOnJob: Build
+    environmentName: QA
+    dependsOnJob: Build
