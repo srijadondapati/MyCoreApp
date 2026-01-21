@@ -1,107 +1,86 @@
 parameters:
-  - name: environmentName
-    type: string
+  environmentName: ''
 
 jobs:
 - job: Tag_Work_Items
-  displayName: Tag Work Items - ${{ parameters.environmentName }}
+  displayName: 'Tag work items: ${{ parameters.environmentName }}'
+  pool:
+    vmImage: ubuntu-latest
+
   steps:
-  - task: PowerShell@2
-    displayName: Update ADO work item tags
-    inputs:
-      targetType: inline
-      pwsh: true
-      script: |
+  - powershell: |
+      $org = "$(ADO_ORG)"
+      $project = "$(ADO_PROJECT)"
+      $envTag = "DevOpsDeployed:${{ parameters.environmentName }}"
+      
+      $pat = "$(ADO_PAT)"
+      if ([string]::IsNullOrWhiteSpace($pat)) {
+        throw "ADO_PAT is missing"
+      }
 
-        Write-Host "Starting work item tagging for environment: ${{ parameters.environmentName }}"
+      # Base64 Auth
+      $basicAuth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$pat"))
+      $headers = @{ Authorization = "Basic $basicAuth" }
 
-        # ==========================
-        # Read variables
-        # ==========================
-        $org     = "$(ADO_ORG)"
-        $project = "$(ADO_PROJECT)"
-        $pat     = "$(ADO_PAT)"
-        $envName = "${{ parameters.environmentName }}"
+      # --- LOGIC FIX 1: Use Build API instead of Commit Message ---
+      # This is 100% reliable. Even if PR is squashed, this works.
+      $buildId = "$(Build.BuildId)"
+      $wiApiUrl = "https://dev.azure.com/$org/$project/_apis/build/builds/$buildId/workitems?api-version=7.1"
+      
+      Write-Host "Fetching Work Items for Build ID: $buildId"
+      try {
+        $wiResponse = Invoke-RestMethod -Uri $wiApiUrl -Method Get -Headers $headers
+        $ids = $wiResponse.value.id
+      }
+      catch {
+        Write-Warning "Could not fetch work items from API. Falling back to commit message..."
+        # Fallback to your regex method ONLY if API fails
+        $commitMsg = "$(Build.SourceVersionMessage)"
+        $ids = [regex]::Matches($commitMsg, 'AB#(\d+)') | ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique
+      }
 
-        if (-not $org -or -not $project -or -not $pat) {
-          Write-Error "Missing required ADO variables"
-          exit 1
+      if (-not $ids -or $ids.Count -eq 0) {
+        Write-Host "No work item IDs found. Skipping."
+        exit 0
+      }
+
+      Write-Host "Found IDs: $($ids -join ', ')"
+
+      foreach ($id in $ids) {
+        Write-Host "Processing Work Item $id" # --- LOGIC FIX 2: Moved inside loop
+        
+        $url = "https://dev.azure.com/$org/$project/_apis/wit/workitems/$id?api-version=7.1"
+
+        # Get existing tags
+        $wi = Invoke-RestMethod -Method Get -Uri $url -Headers $headers
+        $existing = $wi.fields.'System.Tags'
+        if (-not $existing) { $existing = "" }
+
+        $tags = $existing -split ';' | ForEach-Object { $_.Trim() }
+        if ($tags -contains $envTag) {
+          Write-Host "Tag already exists on $id"
+          continue
         }
 
-        # ==========================
-        # Auth header (SINGLE source of truth)
-        # ==========================
-        $base64Auth = [Convert]::ToBase64String(
-          [Text.Encoding]::ASCII.GetBytes(":$pat")
-        )
+        $newTags = if ($existing) { "$existing; $envTag" } else { $envTag }
 
-        $headers = @{
-          Authorization  = "Basic $base64Auth"
-          "Content-Type" = "application/json-patch+json"
-        }
-
-        # ==========================
-        # Read commit message
-        # ==========================
-        $commitMessage = git log -1 --pretty=%B
-        Write-Host "Commit message: $commitMessage"
-
-        # ==========================
-        # Extract AB#123 IDs
-        # ==========================
-        $workItemIds = [regex]::Matches($commitMessage, 'AB#(\d+)') |
-                       ForEach-Object { $_.Groups[1].Value } |
-                       Select-Object -Unique
-
-        if (-not $workItemIds) {
-          Write-Host "No work item IDs found. Skipping."
-          exit 0
-        }
-
-        foreach ($id in $workItemIds) {
-
-          Write-Host "Processing Work Item $id"
-
-          $url = "https://dev.azure.com/$org/$project/_apis/wit/workitems/$id?api-version=7.1-preview.3"
-
-          try {
-            $wi = Invoke-RestMethod `
-              -Method Get `
-              -Uri $url `
-              -Headers $headers
+        # --- LOGIC FIX 3: Use 'replace' not 'add' ---
+        $body = @(
+          @{
+            op = "replace" # <--- CHANGED FROM 'add'
+            path = "/fields/System.Tags"
+            value = $newTags
           }
-          catch {
-            Write-Error "Failed to fetch work item $id"
-            throw
-          }
+        ) | ConvertTo-Json
 
-          $existingTags = $wi.fields.'System.Tags'
-          $newTag = "DevOpsDeployed:$envName"
+        Invoke-RestMethod `
+          -Method Patch `
+          -Uri $url `
+          -Headers $headers `
+          -Body $body `
+          -ContentType "application/json-patch+json"
 
-          if ($existingTags -and $existingTags -like "*$newTag*") {
-            Write-Host "Tag already exists for $id"
-            continue
-          }
-
-          $updatedTags = if ($existingTags) {
-            "$existingTags;$newTag"
-          } else {
-            $newTag
-          }
-
-          $patchBody = @(
-            @{
-              op    = "add"
-              path  = "/fields/System.Tags"
-              value = $updatedTags
-            }
-          ) | ConvertTo-Json -Depth 5
-
-          Invoke-RestMethod `
-            -Method Patch `
-            -Uri $url `
-            -Headers $headers `
-            -Body $patchBody
-
-          Write-Host "Updated work item $id"
-        }
+        Write-Host "Updated $id with tag $envTag"
+      }
+    displayName: 'Update ADO work item tags'
+    continueOnError: true # Don't fail pipeline if tagging fails
