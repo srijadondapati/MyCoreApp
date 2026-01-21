@@ -1,49 +1,54 @@
 trigger:
   branches:
     include:
-      - master  # Trigger the pipeline on commits to the master branch
+      - master
 
 pool:
   vmImage: 'windows-latest'
 
 variables:
   buildConfiguration: 'Release'
-  dotnetVersion: '10.x' # .NET 10 SDK version
+  dotnetVersion: '10.x'
 
-steps:
-- task: UseDotNet@2
-  inputs:
-    packageType: 'sdk'
-    version: '$(dotnetVersion)'
-    includePreviewVersions: true
+jobs:
+- job: Build
+  displayName: Build Application
+  steps:
+  - task: UseDotNet@2
+    inputs:
+      packageType: 'sdk'
+      version: '$(dotnetVersion)'
+      includePreviewVersions: true
 
-- task: NuGetToolInstaller@1
-  inputs:
-    versionSpec: '5.8.x'
+  - task: NuGetToolInstaller@1
+    inputs:
+      versionSpec: '5.8.x'
 
-- task: NuGetCommand@2
-  inputs:
-    command: 'restore'  # Explicitly specify the restore command
-    restoreSolution: true
-    feedsToUse: 'select'
+  - task: NuGetCommand@2
+    inputs:
+      command: 'restore'
+      restoreSolution: true
+      feedsToUse: 'select'
 
-- task: DotNetCoreCLI@2
-  inputs:
-    command: 'build'
-    projects: '**/*.csproj'  # Corrected to match all .csproj files
-    arguments: '--configuration $(buildConfiguration)'
+  - task: DotNetCoreCLI@2
+    inputs:
+      command: 'build'
+      projects: '**/*.csproj'
+      arguments: '--configuration $(buildConfiguration)'
 
-- task: DotNetCoreCLI@2
-  inputs:
-    command: 'publish'
-    publishWebProjects: true
-    arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
-    zipAfterPublish: true
+  - task: DotNetCoreCLI@2
+    inputs:
+      command: 'publish'
+      publishWebProjects: true
+      arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
+      zipAfterPublish: true
 
-- task: PublishBuildArtifacts@1
-  inputs:
-    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-    ArtifactName: 'drop'
-    publishLocation: 'Container'
+  - task: PublishBuildArtifacts@1
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+      ArtifactName: 'drop'
+      publishLocation: 'Container'
 
-
+- template: template/tag-workitems.yaml
+  parameters:
+    environmentName: BUILD
