@@ -2,18 +2,13 @@ parameters:
 - name: environmentName
   type: string
 
-# Name of the deployment job in the SAME stage (e.g., DeployDEV / DeployQA)
 - name: dependsOnJob
   type: string
 
 jobs:
 - job: Tag_Work_Items_${{ parameters.environmentName }}
   displayName: Tag Work Items - ${{ parameters.environmentName }}
-
-  # This is the correct dependency: depend on the ENV deployment job, not Build.
   dependsOn: ${{ parameters.dependsOnJob }}
-
-  # Will run only if the deployment job succeeded
   condition: succeeded()
 
   steps:
@@ -27,25 +22,39 @@ jobs:
       script: |
         Write-Host "Starting work item tagging for environment: ${{ parameters.environmentName }}"
 
-        $org     = "$(ADO_ORG)"
-        $project = "$(ADO_PROJECT)"
+        # ==========================
+        # Read variables
+        # ==========================
+        $org     = "$(ADO_ORG)"       # Example: ProjectSR   (ORG name only)
         $pat     = "$(ADO_PAT)"
         $envName = "${{ parameters.environmentName }}"
+        $apiVersion = "7.1-preview.3"
 
-        if ([string]::IsNullOrWhiteSpace($org) -or [string]::IsNullOrWhiteSpace($project) -or [string]::IsNullOrWhiteSpace($pat)) {
-          Write-Error "Missing required ADO variables (ADO_ORG / ADO_PROJECT / ADO_PAT)."
+        if ([string]::IsNullOrWhiteSpace($org) -or [string]::IsNullOrWhiteSpace($pat)) {
+          Write-Error "Missing required variables: ADO_ORG and/or ADO_PAT."
           exit 1
         }
 
+        # ==========================
+        # Auth header (PAT)
+        # ==========================
         $base64Auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$pat"))
         $authHeader = @{ Authorization = "Basic $base64Auth" }
 
+        # ==========================
+        # Read commit message
+        # ==========================
         $commitMessage = git log -1 --pretty=%B
         Write-Host "Commit message: $commitMessage"
 
-        $workItemIds = [regex]::Matches($commitMessage, 'AB#(\d+)') |
-                       ForEach-Object { $_.Groups[1].Value } |
-                       Select-Object -Unique
+        # ==========================
+        # Extract AB#123 IDs
+        # ==========================
+        $workItemIds =
+          [regex]::Matches($commitMessage, 'AB#(\d+)') |
+          ForEach-Object { $_.Groups[1].Value } |
+          Where-Object { $_ -match '^\d+$' } |
+          Select-Object -Unique
 
         if (-not $workItemIds -or $workItemIds.Count -eq 0) {
           Write-Host "No work item IDs found. Skipping."
@@ -53,15 +62,18 @@ jobs:
         }
 
         foreach ($id in $workItemIds) {
-          Write-Host "Processing Work Item $id"
 
-          $url = "https://dev.azure.com/$org/$project/_apis/wit/workitems/$id?api-version=7.1-preview.3"
+          Write-Host "Processing Work Item: [$id]"
+
+          # IMPORTANT:
+          # Use ORG-scoped endpoint (no project segment) to avoid 404 when project name differs.
+          $url = "https://dev.azure.com/$org/_apis/wit/workitems/$($id)?api-version=$apiVersion"
           Write-Host "GET: $url"
 
           try {
             $wi = Invoke-RestMethod -Method Get -Uri $url -Headers $authHeader -ErrorAction Stop
           } catch {
-            Write-Error "Failed to fetch work item $id. Check ADO_ORG/ADO_PROJECT and PAT scope. Details: $($_.Exception.Message)"
+            Write-Error "Failed to fetch work item $id. HTTP error: $($_.Exception.Message)"
             exit 1
           }
 
@@ -69,7 +81,7 @@ jobs:
           $newTag = "DevOpsDeployed:$envName"
 
           if ($existingTags -and $existingTags -like "*$newTag*") {
-            Write-Host "Tag already exists for $id"
+            Write-Host "Tag already exists for $id: $newTag"
             continue
           }
 
@@ -83,6 +95,9 @@ jobs:
             }
           ) | ConvertTo-Json -Depth 5
 
+          Write-Host "PATCH: $url"
+          Write-Host "New Tags: $updatedTags"
+
           try {
             Invoke-RestMethod `
               -Method Patch `
@@ -94,7 +109,7 @@ jobs:
               -Body $patchBody `
               -ErrorAction Stop
           } catch {
-            Write-Error "Failed to update work item $id. Details: $($_.Exception.Message)"
+            Write-Error "Failed to update work item $id. HTTP error: $($_.Exception.Message)"
             exit 1
           }
 
