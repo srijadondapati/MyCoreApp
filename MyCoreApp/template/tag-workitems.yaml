@@ -1,10 +1,11 @@
+# template/tag-workitems.yaml
 parameters:
 - name: environmentName
   type: string
 
 steps:
 - task: PowerShell@2
-  displayName: Update ADO work item tags (${{ parameters.environmentName }})
+  displayName: Tag ADO work items (${{ parameters.environmentName }})
   inputs:
     targetType: inline
     pwsh: true
@@ -14,107 +15,67 @@ steps:
       # ==========================
       # Read variables
       # ==========================
-      $org     = "$(ADO_ORG)".Trim()
-      $pat     = "$(ADO_PAT)".Trim()
-      $envName = "${{ parameters.environmentName }}".Trim()
+      $org     = "$(ADO_ORG)"
+      $project = "$(ADO_PROJECT)"
+      $pat     = "$(ADO_PAT)"
+      $envName = "${{ parameters.environmentName }}"
 
-      if (-not $org -or -not $pat) {
-        Write-Error "Missing required variables. ADO_ORG or ADO_PAT is empty."
+      if ([string]::IsNullOrWhiteSpace($org) -or [string]::IsNullOrWhiteSpace($project) -or [string]::IsNullOrWhiteSpace($pat)) {
+        Write-Error "Missing required ADO variables (ADO_ORG / ADO_PROJECT / ADO_PAT)."
         exit 1
       }
 
-      Write-Host "ADO_ORG = '$org'"
-      Write-Host "ENV     = '$envName'"
-
       # ==========================
-      # Auth header (PAT)
+      # Auth header
       # ==========================
       $base64Auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$pat"))
-      $headers = @{
-        Authorization = "Basic $base64Auth"
-        "Content-Type" = "application/json"
-      }
+      $authHeader = @{ Authorization = "Basic $base64Auth" }
 
       # ==========================
-      # Read commit message
+      # Get a reliable commit message range
+      # Prefer the build's source version if available
       # ==========================
-      $commitMessage = git log -1 --pretty=%B
+      $sourceSha = "$(Build.SourceVersion)"
+      if ([string]::IsNullOrWhiteSpace($sourceSha)) {
+        $sourceSha = (git rev-parse HEAD)
+      }
+
+      # Collect messages from the last merge commit / commit
+      # (keeps it simple and works for your current "Merged PR ..: AB#123" pattern)
+      $commitMessage = (git log -1 --pretty=%B $sourceSha)
       Write-Host "Commit message: $commitMessage"
 
       # ==========================
       # Extract AB#123 IDs
       # ==========================
-      $workItemIds = [regex]::Matches($commitMessage, 'AB#(\d+)') |
+      $workItemIds =
+        [regex]::Matches($commitMessage, 'AB#(\d+)') |
         ForEach-Object { $_.Groups[1].Value } |
         Select-Object -Unique
 
       if (-not $workItemIds -or $workItemIds.Count -eq 0) {
-        Write-Host "No work item IDs found. Skipping."
+        Write-Host "No work item IDs found in commit message. Skipping."
         exit 0
       }
-
-      # ==========================
-      # Helper: call REST and show real failures
-      # ==========================
-      function Invoke-AdoRest {
-        param(
-          [Parameter(Mandatory=$true)][string]$Method,
-          [Parameter(Mandatory=$true)][string]$Url,
-          [Parameter(Mandatory=$false)][string]$Body
-        )
-
-        try {
-          if ($Body) {
-            return Invoke-RestMethod -Method $Method -Uri $Url -Headers $headers -Body $Body -ErrorAction Stop
-          } else {
-            return Invoke-RestMethod -Method $Method -Uri $Url -Headers $headers -ErrorAction Stop
-          }
-        }
-        catch {
-          $status = $null
-          $respText = $null
-
-          if ($_.Exception.Response) {
-            try {
-              $status = [int]$_.Exception.Response.StatusCode
-              $stream = $_.Exception.Response.GetResponseStream()
-              if ($stream) {
-                $reader = New-Object System.IO.StreamReader($stream)
-                $respText = $reader.ReadToEnd()
-              }
-            } catch { }
-          }
-
-          Write-Error "REST FAILED: $Method $Url"
-          if ($status)   { Write-Error "HTTP Status: $status" }
-          if ($respText) { Write-Error "Response: $respText" }
-          throw
-        }
-      }
-
-      # ==========================
-      # (Optional) Quick auth sanity check
-      # If this fails with 401/403, PAT/auth is the problem, not the work item.
-      # ==========================
-      $authTestUrl = "https://dev.azure.com/$org/_apis/connectiondata?api-version=7.1"
-      Write-Host "Auth test: $authTestUrl"
-      Invoke-AdoRest -Method Get -Url $authTestUrl | Out-Null
-      Write-Host "Auth test passed."
 
       foreach ($id in $workItemIds) {
         Write-Host "Processing Work Item $id"
 
-        # Org-level endpoint (no project). Avoids wrong project segment issues.
-        $wiUrl = "https://dev.azure.com/$org/_apis/wit/workitems/$id?api-version=7.1"
-        Write-Host "GET: $wiUrl"
+        $url = "https://dev.azure.com/$org/$project/_apis/wit/workitems/$id?api-version=7.1-preview.3"
 
-        $wi = Invoke-AdoRest -Method Get -Url $wiUrl
+        try {
+          $wi = Invoke-RestMethod -Method Get -Uri $url -Headers $authHeader -ErrorAction Stop
+        }
+        catch {
+          Write-Error "Failed to fetch work item $id. HTTP call failed. Details: $($_.Exception.Message)"
+          exit 1
+        }
 
         $existingTags = $wi.fields.'System.Tags'
         $newTag = "DevOpsDeployed:$envName"
 
         if ($existingTags -and $existingTags -like "*$newTag*") {
-          Write-Host "Tag already exists for Work Item $id => $newTag"
+          Write-Host "Tag already exists on $id: $newTag"
           continue
         }
 
@@ -122,14 +83,27 @@ steps:
 
         $patchBody = @(
           @{
-            op   = "add"
-            path = "/fields/System.Tags"
+            op    = "add"
+            path  = "/fields/System.Tags"
             value = $updatedTags
           }
         ) | ConvertTo-Json -Depth 5
 
-        Write-Host "PATCH: $wiUrl"
-        Invoke-AdoRest -Method Patch -Url $wiUrl -Body $patchBody | Out-Null
+        try {
+          Invoke-RestMethod `
+            -Method Patch `
+            -Uri $url `
+            -Headers @{
+              Authorization  = $authHeader.Authorization
+              "Content-Type" = "application/json-patch+json"
+            } `
+            -Body $patchBody `
+            -ErrorAction Stop
+        }
+        catch {
+          Write-Error "Failed to update work item $id. Details: $($_.Exception.Message)"
+          exit 1
+        }
 
-        Write-Host "Updated Work Item $id with tag: $newTag"
+        Write-Host "Updated work item $id with tag: $newTag"
       }
