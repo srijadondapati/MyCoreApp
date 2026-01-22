@@ -8,165 +8,191 @@ jobs:
   displayName: 'Tag work items: ${{ parameters.environmentName }}'
   pool:
     vmImage: ubuntu-latest
-
   steps:
   - task: PowerShell@2
     displayName: 'Update Azure DevOps Work Item Tags'
     inputs:
       targetType: 'inline'
       script: |
-        # =========================================================
-        # Configuration / Inputs
-        # =========================================================
-        $org     = "$(ADO_ORG)"              # Azure DevOps organization
-        $project = "$(ADO_PROJECT)"          # Azure DevOps project
-        $envTag  = "DevOpsDeployed:${{ parameters.environmentName }}"  # New environment tag
-
+        
+        # Configuration
+        $org = "$(ADO_ORG)"
+        $project = "$(ADO_PROJECT)"
+        $envTag = "DevOpsDeployed:${{ parameters.environmentName }}"
+        
         Write-Host "=========================================="
         Write-Host "Azure DevOps Work Item Tag Update"
         Write-Host "=========================================="
-        Write-Host "Organization : $org"
-        Write-Host "Project      : $project"
-        Write-Host "Environment  : $envTag"
+        Write-Host "Environment Tag: $envTag"
+        Write-Host "Organization: $org"
+        Write-Host "Project: $project"
+        Write-Host ""
 
-        # =========================================================
-        # Validate PAT
-        # =========================================================
+        # Validate PAT token
         $pat = "$(ADO_PAT)"
         if ([string]::IsNullOrWhiteSpace($pat)) {
-          throw "ADO_PAT is missing. Please check variable group 'workitem-tagging-secrets'."
+          throw "ADO_PAT is missing. Please check your variable group 'workitem-tagging-secrets'."
         }
 
-        # =========================================================
-        # Build Authorization Header (Basic Auth)
-        # =========================================================
+        # Create authentication header
         $basicAuth = [Convert]::ToBase64String(
           [Text.Encoding]::ASCII.GetBytes(":$pat")
         )
+        $headers = @{
+          Authorization = "Basic $basicAuth"
+        }
 
-        # =========================================================
-        # Extract Work Item IDs from Commit Message (AB#1234)
-        # =========================================================
+        # ==========================================
+        # STEP 1: Extract Work Item IDs from commit message
+        # ==========================================
         $commitMsg = "$(Build.SourceVersionMessage)"
-        Write-Host "Commit Message: $commitMsg"
-
+        Write-Host "📝 Commit Message: $commitMsg"
+        
+        # Find all AB#12345 patterns in commit message
         $ids = [regex]::Matches($commitMsg, 'AB#(\d+)') |
                ForEach-Object { $_.Groups[1].Value } |
                Select-Object -Unique
 
-        Write-Host "Work Item IDs found: $($ids -join ', ')"
+        Write-Host "🔍 Found work item IDs: $($ids -join ', ')"
+        Write-Host ""
 
         if ($ids.Count -eq 0) {
-          Write-Host "No linked work items found. Exiting."
+          Write-Host "⚠️ No work items found. Skipping."
           exit 0
         }
 
-        # =========================================================
-        # Counters for summary
-        # =========================================================
+        # ==========================================
+        # STEP 2: Process each work item
+        # ==========================================
         $successCount = 0
         $failureCount = 0
-
-        # =========================================================
-        # Process Each Work Item
-        # =========================================================
+        
         foreach ($id in $ids) {
-
           Write-Host ""
-          Write-Host "------------------------------------------"
-          Write-Host "Processing Work Item ID: $id"
-          Write-Host "------------------------------------------"
-
+          Write-Host "➡️ Processing Work Item ID: $id"
+          Write-Host "----------------------------------------"
+          
           try {
-            # -----------------------------------------------------
-            # Work Item API URL
-            # -----------------------------------------------------
-            $url = "https://dev.azure.com/$org/$project/_apis/wit/workitems/$id?api-version=7.1-preview.3"
+            # ==========================================
+            # STEP 2a: Get current work item details
+            # ==========================================
+            $url = "https://dev.azure.com/$org/$project/_apis/wit/workitems/$($id)?api-version=7.1-preview.3"
+            Write-Host "📡 API URL: $url"
+            
+            # Fetch current work item
+            $wi = Invoke-RestMethod -Method Get -Uri $url -Headers $headers
 
-            # -----------------------------------------------------
-            # Get Existing Work Item
-            # -----------------------------------------------------
-            $wi = Invoke-RestMethod -Method Get -Uri $url -Headers @{
-              Authorization = "Basic $basicAuth"
-            }
-
-            $wiTitle      = $wi.fields.'System.Title'
+            $wiTitle = $wi.fields.'System.Title'
             $existingTags = $wi.fields.'System.Tags'
-            if (-not $existingTags) { $existingTags = "" }
-
-            Write-Host "Title         : $wiTitle"
-            Write-Host "Existing Tags : '$existingTags'"
-
-            # -----------------------------------------------------
-            # Split existing tags into array
-            # -----------------------------------------------------
-            $tagList = @()
-            if (-not [string]::IsNullOrWhiteSpace($existingTags)) {
-              $tagList = $existingTags -split ';' | ForEach-Object { $_.Trim() }
+            if ([string]::IsNullOrWhiteSpace($existingTags)) { 
+              $existingTags = "" 
             }
 
-            # -----------------------------------------------------
-            # Skip if same DevOpsDeployed tag already exists
-            # -----------------------------------------------------
-            if ($tagList -contains $envTag) {
-              Write-Host "Already tagged with $envTag. Skipping."
+            Write-Host "📋 Title: $wiTitle"
+            Write-Host "🏷️ Current Tags: '$existingTags'"
+            
+            # ==========================================
+            # STEP 2b: Check if already has this exact tag
+            # ==========================================
+            if ($existingTags -match [regex]::Escape($envTag)) { 
+              Write-Host "✅ Already tagged with: $envTag (no change needed)"
               $successCount++
-              continue
+              continue 
             }
 
-            # -----------------------------------------------------
-            # Remove ALL existing DevOpsDeployed:* tags
-            # -----------------------------------------------------
-            $filteredTags = $tagList | Where-Object { $_ -notmatch '^DevOpsDeployed:' }
-
-            # -----------------------------------------------------
-            # Add new environment tag
-            # -----------------------------------------------------
+            # ==========================================
+            # STEP 2c: Calculate new tags by REPLACING DevOpsDeployed tags
+            # ==========================================
+            # Split existing tags by semicolon
+            $tagArray = @()
+            if (-not [string]::IsNullOrWhiteSpace($existingTags)) {
+              $tagArray = $existingTags -split ';' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+            }
+            
+            # Remove any existing DevOpsDeployed:* tags
+            $filteredTags = @()
+            foreach ($tag in $tagArray) {
+              if ($tag -notlike "DevOpsDeployed:*") {
+                $filteredTags += $tag
+              }
+            }
+            
+            # Add the new environment tag
             $filteredTags += $envTag
-
-            # -----------------------------------------------------
-            # Rebuild tag string
-            # -----------------------------------------------------
-            $newTags = $filteredTags -join '; '
-
-            Write-Host "Updated Tags  : '$newTags'"
-
-            # -----------------------------------------------------
-            # Create PATCH payload
-            # -----------------------------------------------------
+            
+            # Join back into semicolon-separated string
+            $newTags = ($filteredTags | Sort-Object) -join '; '
+            
+            Write-Host "🔄 Tag Transformation:"
+            Write-Host "   Before: '$existingTags'"
+            Write-Host "   After:  '$newTags'"
+            
+            # ==========================================
+            # STEP 2d: Update the work item
+            # ==========================================
+            # Create JSON patch document for replacing tags
             $patchDocument = '[{"op":"replace","path":"/fields/System.Tags","value":"' + $newTags + '"}]'
-
-            # -----------------------------------------------------
-            # Update Work Item
-            # -----------------------------------------------------
-            Invoke-RestMethod -Method Patch -Uri $url -Headers @{
+            
+            Write-Host "📤 Sending PATCH request..."
+            $response = Invoke-RestMethod -Method Patch -Uri $url -Headers @{
               Authorization  = "Basic $basicAuth"
               "Content-Type" = "application/json-patch+json"
             } -Body $patchDocument
-
-            Write-Host "Work Item $id updated successfully"
+            
+            Write-Host "✅ Successfully updated Work Item $id"
+            Write-Host "   Title: $wiTitle"
+            Write-Host "   New Tags: $($response.fields.'System.Tags')"
             $successCount++
-
-          }
-          catch {
-            Write-Host "Error updating Work Item $id"
-            Write-Host "Error: $($_.Exception.Message)"
+            
+          } catch {
+            # ==========================================
+            # STEP 2e: Error handling
+            # ==========================================
+            Write-Host "❌ Error updating Work Item $id"
+            Write-Host "   Error Message: $($_.Exception.Message)"
+            
+            # Try to get detailed error response
+            try {
+              if ($_.Exception.Response) {
+                $errorStream = $_.Exception.Response.GetResponseStream()
+                $errorStream.Position = 0
+                $reader = New-Object System.IO.StreamReader($errorStream)
+                $errorBody = $reader.ReadToEnd()
+                Write-Host "   Error Response: $errorBody"
+                
+                # Check for common errors
+                if ($errorBody -match "TF401232") {
+                  Write-Host "   💡 Hint: Work item might not exist or you don't have permission"
+                } elseif ($errorBody -match "401") {
+                  Write-Host "   💡 Hint: Check your ADO_PAT token permissions"
+                }
+              }
+            } catch {
+              Write-Host "   Could not read error response"
+            }
+            
             $failureCount++
           }
         }
-
-        # =========================================================
-        # Final Summary
-        # =========================================================
+        
+        # ==========================================
+        # STEP 3: Summary
+        # ==========================================
         Write-Host ""
         Write-Host "=========================================="
-        Write-Host "Update Summary"
+        Write-Host "📊 Update Summary"
         Write-Host "=========================================="
-        Write-Host "Successfully updated : $successCount"
-        Write-Host "Failed              : $failureCount"
-        Write-Host "Total processed     : $($ids.Count)"
+        Write-Host "✅ Successfully updated: $successCount"
+        Write-Host "❌ Failed: $failureCount"
+        Write-Host "📋 Total processed: $($ids.Count)"
         Write-Host "=========================================="
-
+        
+        # Add warning to pipeline logs if any failures
         if ($failureCount -gt 0) {
-          Write-Host "##vso[task.logissue type=warning]Some work items failed to update"
+          Write-Host "##vso[task.logissue type=warning]Some work items failed to update. Check logs above."
+        }
+        
+        # Exit with error if all failed
+        if ($successCount -eq 0 -and $failureCount -gt 0) {
+          Write-Host "##vso[task.complete result=Failed]"
         }
