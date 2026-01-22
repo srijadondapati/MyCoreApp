@@ -26,8 +26,8 @@ jobs:
         $project = "$(ADO_PROJECT)"
 
         # Deployment tag to apply to work items
-        # Example: DevOpsDeployed:DEV / DevOpsDeployed:QA
-        $envTag = "DevOpsDeployed:${{ parameters.environmentName }}"
+        # Example: DeployedEnv:DEV / DeployedEnv:QA
+        $envTag = "DeployedEnv:${{ parameters.environmentName }}"
         
         # ---------------------------------------------------------
         # Log execution context
