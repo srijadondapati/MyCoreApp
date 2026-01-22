@@ -55,4 +55,4 @@ jobs:
 
 - template: MyCoreApp/template/tag-workitems.yaml
   parameters:
-    environmentName: STAGING
+    environmentName: PROD
