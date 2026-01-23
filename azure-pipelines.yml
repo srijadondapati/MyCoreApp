@@ -1,4 +1,3 @@
-##
 trigger:
   branches:
     include:
@@ -15,6 +14,9 @@ variables:
   value: '10.x'
 
 jobs:
+# ----------------------------
+# Build Job
+# ----------------------------
 - job: Build
   displayName: Build MyCoreApp
   steps:
@@ -53,17 +55,26 @@ jobs:
       ArtifactName: 'drop'
       publishLocation: 'Container'
 
+# ----------------------------
+# Tag DEV
+# ----------------------------
 - template: MyCoreApp/template/tag-workitems.yaml
   parameters:
     environmentName: dev
     enableWorkItemTagging: true
 
+# ----------------------------
+# Tag QA
+# ----------------------------
 - template: MyCoreApp/template/tag-workitems.yaml
   parameters:
     environmentName: qa
+   # enableWorkItemTagging: false
 
+# ----------------------------
+# Tag PROD
+# ----------------------------
 - template: MyCoreApp/template/tag-workitems.yaml
   parameters:
     environmentName: prod
-    enableWorkItemTagging: true 
-    
+    enableWorkItemTagging: true
