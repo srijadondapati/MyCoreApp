@@ -1,13 +1,17 @@
 parameters:
 - name: environment
   type: string
+- name: enableWorkItemTagging
+  type: boolean
+  default: false
 
 steps:
-- task: PowerShell@2
-  displayName: 'Update Azure DevOps Work Item Tags'
-  condition: succeeded()
-  inputs:
-    targetType: filePath
-    filePath: MyCoreApp/template/tag-work-items.ps1
-    arguments: >
-      -environment ${{ parameters.environment }}
+- ${{ if eq(parameters.enableWorkItemTagging, true) }}:
+  - task: PowerShell@2
+    displayName: 'Update Azure DevOps Work Item Tags'
+    condition: succeeded()
+    inputs:
+      targetType: filePath
+      filePath: MyCoreApp/template/tag-work-items.ps1
+      arguments: >
+        -environment ${{ parameters.environment }}
