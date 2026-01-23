@@ -1,0 +1,13 @@
+parameters:
+- name: environment
+  type: string
+
+steps:
+- task: PowerShell@2
+  displayName: 'Update Azure DevOps Work Item Tags'
+  condition: succeeded()
+  inputs:
+    targetType: filePath
+    filePath: scripts/tag-work-items.ps1
+    arguments: >
+      -environment ${{ parameters.environment }}
