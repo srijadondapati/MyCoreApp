@@ -8,16 +8,30 @@ jobs:
   displayName: 'Tag work items: ${{ parameters.environmentName }}'
   pool:
     vmImage: ubuntu-latest
+
   steps:
   - task: PowerShell@2
     displayName: 'Update Azure DevOps Work Item Tags'
     inputs:
       targetType: 'inline'
       script: |
+        # =========================================================
+        # SECTION 0: Basic configuration
+        # =========================================================
+
+        # Azure DevOps organization name
         $org = "$(ADO_ORG)"
+
+        # Azure DevOps project name
         $project = "$(ADO_PROJECT)"
-        $envTag = "DevOpsDeployed:${{ parameters.environmentName }}"
+
+        # Deployment tag to apply to work items
+        # Example: DeployedEnv:DEV / DeployedEnv:QA
+        $envTag = "DeployedEnv:${{ parameters.environmentName }}"
         
+        # ---------------------------------------------------------
+        # Log execution context
+        # ---------------------------------------------------------
         Write-Host "=========================================="
         Write-Host "Azure DevOps Work Item Tag Update"
         Write-Host "=========================================="
@@ -25,64 +39,100 @@ jobs:
         Write-Host "Organization: $org"
         Write-Host "Project: $project"
 
+        # =========================================================
+        # SECTION 1: Validate Personal Access Token (PAT)
+        # =========================================================
+
+        # PAT is required to authenticate with Azure DevOps REST APIs
         $pat = "$(ADO_PAT)"
+
+        # Fail the pipeline if PAT is missing
         if ([string]::IsNullOrWhiteSpace($pat)) {
           throw "ADO_PAT is missing. Please check your variable group 'workitem-tagging-secrets'."
         }
 
-        # Auth header
+        # =========================================================
+        # SECTION 2: Build authentication header
+        # =========================================================
+
+        # Azure DevOps requires Basic Auth with Base64-encoded PAT
         $basicAuth = [Convert]::ToBase64String(
           [Text.Encoding]::ASCII.GetBytes(":$pat")
         )
 
-        # Extract Work Item IDs from commit message
+        # =========================================================
+        # SECTION 3: Extract Work Item IDs from commit message
+        # =========================================================
+
+        # Commit message from the build
         $commitMsg = "$(Build.SourceVersionMessage)"
         Write-Host "Commit Message: $commitMsg"
         
+        # Extract work item IDs referenced using AB#<id>
         $ids = [regex]::Matches($commitMsg, 'AB#(\d+)') |
                ForEach-Object { $_.Groups[1].Value } |
                Select-Object -Unique
 
+        # Log discovered work item IDs
         Write-Host "Found work item IDs: $($ids -join ', ')"
 
+        # Exit early if no work items are referenced
         if ($ids.Count -eq 0) {
           Write-Host "No work items found. Skipping."
           exit 0
         }
 
+        # =========================================================
+        # SECTION 4: Initialize counters
+        # =========================================================
         $successCount = 0
         $failureCount = 0
         
+        # =========================================================
+        # SECTION 5: Process each work item
+        # =========================================================
         foreach ($id in $ids) {
+
           Write-Host ""
           Write-Host "➡️ Processing Work Item ID: $id"
           Write-Host "----------------------------------------"
           
           try {
-            # Construct URL
+            # -----------------------------------------------------
+            # STEP 5a: Build Work Item REST API URL
+            # -----------------------------------------------------
             $url = "https://dev.azure.com/$org/$project/_apis/wit/workitems/$($id)?api-version=7.1-preview.3"
             Write-Host "API URL: $url"
             
-            # Read existing work item
+            # -----------------------------------------------------
+            # STEP 5b: Read existing work item
+            # -----------------------------------------------------
             $wi = Invoke-RestMethod -Method Get -Uri $url -Headers @{
               Authorization = "Basic $basicAuth"
             }
 
+            # Extract work item title and existing tags
             $wiTitle = $wi.fields.'System.Title'
             $existingTags = $wi.fields.'System.Tags'
+
+            # Normalize empty tags
             if (-not $existingTags) { $existingTags = "" }
 
             Write-Host "Title: $wiTitle"
             Write-Host "Current Tags: '$existingTags'"
             
-            # Check if already has this tag
+            # -----------------------------------------------------
+            # STEP 5c: Skip update if tag already exists
+            # -----------------------------------------------------
             if ($existingTags -match [regex]::Escape($envTag)) { 
               Write-Host "✅ Already tagged with: $envTag"
               $successCount++
               continue 
             }
 
-            # Calculate new tags
+            # -----------------------------------------------------
+            # STEP 5d: Calculate new tags (append behavior)
+            # -----------------------------------------------------
             if ([string]::IsNullOrWhiteSpace($existingTags)) {
               $newTags = $envTag
             } else {
@@ -91,11 +141,16 @@ jobs:
 
             Write-Host "New Tags: '$newTags'"
 
-            # Create JSON manually (no here-string)
+            # -----------------------------------------------------
+            # STEP 5e: Create JSON PATCH document
+            # -----------------------------------------------------
             $patchDocument = '[{"op":"replace","path":"/fields/System.Tags","value":"' + $newTags + '"}]'
             
             Write-Host "Patch Document: $patchDocument"
             
+            # -----------------------------------------------------
+            # STEP 5f: Send PATCH request to update work item
+            # -----------------------------------------------------
             Write-Host "Sending PATCH request..."
             $response = Invoke-RestMethod -Method Patch -Uri $url -Headers @{
               Authorization  = "Basic $basicAuth"
@@ -108,10 +163,13 @@ jobs:
             $successCount++
             
           } catch {
+            # -----------------------------------------------------
+            # STEP 5g: Error handling for work item update
+            # -----------------------------------------------------
             Write-Host "❌ Error updating Work Item $id"
             Write-Host "   Error Message: $($_.Exception.Message)"
             
-            # Try to get the response body for debugging
+            # Attempt to read detailed error response from API
             try {
               if ($_.Exception.Response) {
                 $errorStream = $_.Exception.Response.GetResponseStream()
@@ -128,6 +186,9 @@ jobs:
           }
         }
         
+        # =========================================================
+        # SECTION 6: Final summary
+        # =========================================================
         Write-Host ""
         Write-Host "=========================================="
         Write-Host "Update Summary:"
@@ -136,6 +197,7 @@ jobs:
         Write-Host "Total processed: $($ids.Count)"
         Write-Host "=========================================="
         
+        # Add pipeline warning if any failures occurred
         if ($failureCount -gt 0) {
           Write-Host "##vso[task.logissue type=warning]Some work items failed to update"
         }

@@ -1,0 +1,25 @@
+parameters:
+    env: ''
+    enableWorkItemTagging: false
+
+
+jobs:
+  - deployment: Deploy
+    displayName: 'Deploy_${{ parameters.appname }}'
+    pool: ${{ Parameters.pool }}
+    variables:
+      appname: ${{ parameters.appname }}
+      env: ${{ parameters.env }}
+    environment: ${{ parameters.env }}
+    strategy:
+      runOnce:
+        deploy:     
+          steps:
+          
+          # ==================================================
+          # Work Item Tagging
+          # ==================================================
+          - ${{ if eq(parameters.enableWorkItemTagging, true) }}:
+            - template: MyCoreApp/template/tag-work-items-steps.yml
+              parameters:
+                environment: ${{ parameters.env }}
