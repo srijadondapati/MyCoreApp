@@ -58,23 +58,35 @@ jobs:
 # ----------------------------
 # Tag DEV
 # ----------------------------
-- template: MyCoreApp/template/tag-workitems.yaml
-  parameters:
-    environmentName: dev
-    enableWorkItemTagging: true
+- job: Tag_DEV
+  displayName: Tag Work Items - DEV
+  #dependsOn: Build
+  steps:
+  - template: MyCoreApp/template/tag-work-items-steps.yml
+    parameters:
+      environmentName: dev
+      enableWorkItemTagging: true
 
 # ----------------------------
 # Tag QA
 # ----------------------------
-- template: MyCoreApp/template/tag-workitems.yaml
-  parameters:
-    environmentName: qa
-   # enableWorkItemTagging: false
+- job: Tag_QA
+  displayName: Tag Work Items - QA
+  #dependsOn: Build
+  steps:
+  - template: MyCoreApp/template/tag-work-items-steps.yml
+    parameters:
+      environmentName: qa
+      #enableWorkItemTagging: true
 
 # ----------------------------
 # Tag PROD
 # ----------------------------
-- template: MyCoreApp/template/work-items-templates.yml
-  parameters:
-    environmentName: prod
-    enableWorkItemTagging: true
+- job: Tag_PROD
+  displayName: Tag Work Items - PROD
+  #dependsOn: Build
+  steps:
+  - template: MyCoreApp/template/tag-work-items-steps.yml
+    parameters:
+      environmentName: prod
+      enableWorkItemTagging: true
