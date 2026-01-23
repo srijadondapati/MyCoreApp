@@ -8,6 +8,6 @@ steps:
   condition: succeeded()
   inputs:
     targetType: filePath
-    filePath: scripts/tag-work-items.ps1
+    filePath: MyCoreApp/template/tag-work-items.ps1
     arguments: >
       -environment ${{ parameters.environment }}
