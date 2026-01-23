@@ -55,4 +55,15 @@ jobs:
 
 - template: MyCoreApp/template/tag-workitems.yaml
   parameters:
-    environmentName: QA:newton-ui
+    environmentName: dev
+    enableWorkItemTagging: true
+
+- template: MyCoreApp/template/tag-workitems.yaml
+  parameters:
+    environmentName: qa
+
+- template: MyCoreApp/template/tag-workitems.yaml
+  parameters:
+    environmentName: prod
+    enableWorkItemTagging: true 
+    
