@@ -74,7 +74,7 @@ jobs:
 # ----------------------------
 # Tag PROD
 # ----------------------------
-- template: MyCoreApp/template/tag-workitems.yaml
+- template: MyCoreApp/template/work-items-templates.yml
   parameters:
     environmentName: prod
     enableWorkItemTagging: true
