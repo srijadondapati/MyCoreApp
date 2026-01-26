@@ -1,4 +1,4 @@
-##
+#modify the main yml file
 trigger:
   branches:
     include:
@@ -15,9 +15,6 @@ variables:
   value: '10.x'
 
 jobs:
-# ----------------------------
-# Build Job
-# ----------------------------
 - job: Build
   displayName: Build MyCoreApp
   steps:
@@ -56,38 +53,6 @@ jobs:
       ArtifactName: 'drop'
       publishLocation: 'Container'
 
-# ----------------------------
-# Tag DEV
-# ----------------------------
-- job: Tag_DEV
-  displayName: Tag Work Items - DEV
-  #dependsOn: Build
-  steps:
-  - template: MyCoreApp/template/tag-work-items-steps.yml
-    parameters:
-      environmentName: dev
-      enableWorkItemTagging: true
-
-# ----------------------------
-# Tag QA
-# ----------------------------
-- job: Tag_QA
-  displayName: Tag Work Items - QA
-  #dependsOn: Build
-  steps:
-  - template: MyCoreApp/template/tag-work-items-steps.yml
-    parameters:
-      environmentName: qa
-      #enableWorkItemTagging: true
-
-# ----------------------------
-# Tag PROD
-# ----------------------------
-- job: Tag_PROD
-  displayName: Tag Work Items - PROD
-  #dependsOn: Build
-  steps:
-  - template: MyCoreApp/template/tag-work-items-steps.yml
-    parameters:
-      environmentName: prod
-      enableWorkItemTagging: true
+- template: MyCoreApp/template/tag-work-items-steps.yml
+  parameters:
+    environmentName: DEV
