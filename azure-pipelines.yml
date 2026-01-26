@@ -1,4 +1,3 @@
-#
 trigger:
   branches:
     include:
@@ -15,6 +14,9 @@ variables:
   value: '10.x'
 
 jobs:
+# -------------------------------------------------
+# Build Job
+# -------------------------------------------------
 - job: Build
   displayName: Build MyCoreApp
   steps:
@@ -53,6 +55,14 @@ jobs:
       ArtifactName: 'drop'
       publishLocation: 'Container'
 
-- template: MyCoreApp/template/tag-work-items-steps.yml
-  parameters:
-    environmentName: PROD
+# -------------------------------------------------
+# Tag Work Items – PROD
+# -------------------------------------------------
+- job: Tag_PROD
+  displayName: Tag Work Items - PROD
+  dependsOn: Build
+  condition: succeeded()
+  steps:
+  - template: MyCoreApp/template/tag-work-items-steps.yml
+    parameters:
+      environmentName: PROD
