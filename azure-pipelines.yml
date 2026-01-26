@@ -1,4 +1,4 @@
-#modify the main yml file
+#
 trigger:
   branches:
     include:
@@ -55,4 +55,4 @@ jobs:
 
 - template: MyCoreApp/template/tag-work-items-steps.yml
   parameters:
-    environmentName: DEV
+    environmentName: PROD
