@@ -1,12 +1,20 @@
+# MyCoreApp/template/tag-work-items-steps.yml
+# Template for tagging work items after deployment
+
 parameters:
-- name: environmentName
-  type: string
+  - name: environmentName
+    type: string
+    default: ''
 
 steps:
   - task: PowerShell@2
     displayName: 'Update Azure DevOps Work Item Tags'
     inputs:
-      targetType: filePath
-      filePath: MyCoreApp/template/tag-work-items.ps1
+      targetType: 'filePath'
+      filePath: '$(System.DefaultWorkingDirectory)/MyCoreApp/template/Update-WorkItemTags.ps1.ps1'
       arguments: >
-        -environment ${{ parameters.environmentName }}
+        -Organization "$(ADO_ORG)"
+        -Project "$(ADO_PROJECT)"
+        -PersonalAccessToken "$(ADO_PAT)"
+        -EnvironmentTag "DeployedEnv:${{ parameters.environmentName }}"
+        -CommitMessage "$(Build.SourceVersionMessage)"
