@@ -1,3 +1,9 @@
+# =========================================================
+# Azure DevOps Work Item Tag Update Script
+# =========================================================
+# This script updates work items with deployment tags based on commit messages
+# =========================================================
+
 param(
     [string]$Organization,
     [string]$Project,
@@ -5,6 +11,9 @@ param(
     [string]$EnvironmentTag,
     [string]$CommitMessage
 )
+
+# Set console output encoding to UTF-8
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 # =========================================================
 # SECTION 0: Basic configuration validation
@@ -73,6 +82,7 @@ if ($ids.Count -eq 0) {
 # =========================================================
 $successCount = 0
 $failureCount = 0
+$skippedCount = 0
 
 # =========================================================
 # SECTION 4: Process each work item
@@ -80,7 +90,7 @@ $failureCount = 0
 foreach ($id in $ids) {
 
     Write-Host ""
-    Write-Host "➡️ Processing Work Item ID: $id"
+    Write-Host "-> Processing Work Item ID: $id"
     Write-Host "----------------------------------------"
     
     try {
@@ -109,8 +119,8 @@ foreach ($id in $ids) {
         # STEP 4c: Skip update if tag already exists
         # -----------------------------------------------------
         if ($existingTags -match [regex]::Escape($EnvironmentTag)) { 
-            Write-Host "✅ Already tagged with: $EnvironmentTag"
-            $successCount++
+            Write-Host "[SKIP] Already tagged with: $EnvironmentTag"
+            $skippedCount++
             continue 
         }
 
@@ -138,17 +148,17 @@ foreach ($id in $ids) {
         Write-Host "Sending PATCH request..."
         $response = Invoke-RestMethod -Method Patch -Uri $url -Headers $headers -Body $patchDocument
         
-        Write-Host "✅ Successfully updated Work Item $id"
-        Write-Host "   Title: $wiTitle"
-        Write-Host "   New Tags: $($response.fields.'System.Tags')"
+        Write-Host "[SUCCESS] Updated Work Item $id"
+        Write-Host "  Title: $wiTitle"
+        Write-Host "  New Tags: $($response.fields.'System.Tags')"
         $successCount++
         
     } catch {
         # -----------------------------------------------------
         # STEP 4g: Error handling for work item update
         # -----------------------------------------------------
-        Write-Host "❌ Error updating Work Item $id"
-        Write-Host "   Error Message: $($_.Exception.Message)"
+        Write-Host "[ERROR] Failed to update Work Item $id"
+        Write-Host "  Error Message: $($_.Exception.Message)"
         
         # Attempt to read detailed error response from API
         try {
@@ -157,10 +167,10 @@ foreach ($id in $ids) {
                 $errorStream.Position = 0
                 $reader = New-Object System.IO.StreamReader($errorStream)
                 $errorBody = $reader.ReadToEnd()
-                Write-Host "   Error Response: $errorBody"
+                Write-Host "  Error Response: $errorBody"
             }
         } catch {
-            Write-Host "   Could not read error response"
+            Write-Host "  Could not read error response"
         }
         
         $failureCount++
@@ -173,9 +183,10 @@ foreach ($id in $ids) {
 Write-Host ""
 Write-Host "=========================================="
 Write-Host "Update Summary:"
-Write-Host "✅ Successfully updated: $successCount"
-Write-Host "❌ Failed: $failureCount"
-Write-Host "Total processed: $($ids.Count)"
+Write-Host "[SUCCESS] Updated: $successCount"
+Write-Host "[SKIPPED] Already tagged: $skippedCount"
+Write-Host "[ERROR] Failed: $failureCount"
+Write-Host "Total referenced: $($ids.Count)"
 Write-Host "=========================================="
 
 # Exit with error code if any failures occurred
