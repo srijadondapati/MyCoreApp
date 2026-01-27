@@ -22,9 +22,6 @@ param(
 Write-Host "=========================================="
 Write-Host "Azure DevOps Work Item Tag Update"
 Write-Host "=========================================="
-Write-Host "Environment Tag: $EnvironmentTag"
-Write-Host "Organization: $Organization"
-Write-Host "Project: $Project"
 
 # Validate required parameters
 if ([string]::IsNullOrWhiteSpace($Organization)) {
@@ -42,6 +39,15 @@ if ([string]::IsNullOrWhiteSpace($PersonalAccessToken)) {
 if ([string]::IsNullOrWhiteSpace($EnvironmentTag)) {
     throw "Environment Tag is required."
 }
+
+	
+# ---------------------------------------------------------
+# Normalize environment tag to uppercase (dev -> DEV)
+# ---------------------------------------------------------
+$EnvironmentTag = $EnvironmentTag.ToUpperInvariant()
+Write-Host "Environment Tag: $EnvironmentTag"
+Write-Host "Organization: $Organization"
+Write-Host "Project: $Project"
 
 # =========================================================
 # SECTION 1: Build authentication header
