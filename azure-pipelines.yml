@@ -1,4 +1,4 @@
-#testing description-3
+#testing description
 trigger:
   branches:
     include:
