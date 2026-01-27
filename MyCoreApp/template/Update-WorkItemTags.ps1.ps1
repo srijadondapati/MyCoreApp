@@ -43,7 +43,8 @@ if ([string]::IsNullOrWhiteSpace($EnvironmentTag)) {
 # ---------------------------------------------------------
 # Normalize environment tag to uppercase (dev -> DEV)
 # ---------------------------------------------------------
-$EnvironmentTag = $EnvironmentTag.ToUpperInvariant()
+# $EnvironmentTag = $EnvironmentTag.ToUpperInvariant()
+$EnvironmentTag = "DeployedEnv:$($EnvironmentTag.ToUpperInvariant())"
 Write-Host "Environment Tag: $EnvironmentTag"
 Write-Host "Organization: $Organization"
 Write-Host "Project: $Project"
