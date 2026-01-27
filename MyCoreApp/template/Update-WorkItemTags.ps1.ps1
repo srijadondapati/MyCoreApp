@@ -51,12 +51,12 @@ Write-Host "Organization: $Organization"
 Write-Host "Project: $Project"
 
 # =========================================================
-# SECTION 1: Build authentication header
+# SECTION 1: OAuth authentication header
 # =========================================================
 
 $accessToken = $env:SYSTEM_ACCESSTOKEN
 if ([string]::IsNullOrWhiteSpace($accessToken)) {
-  throw "System.AccessToken is missing. Enable OAuth access for the pipeline."
+  throw "System.AccessToken is missing. Ensure YAML passes env:SYSTEM_ACCESSTOKEN: $(System.AccessToken) and OAuth access is enabled."
 }
 
 $headers = @{
@@ -71,10 +71,7 @@ $headers = @{
 
 $commitMessage = git log -1 --pretty=%B
 
-Write-Host "Full Commit Message:"
-Write-Host "------------------------------------------"
-Write-Host $commitMessage
-Write-Host "------------------------------------------"
+Write-Host "Full Commit Message: $commitMessage"
 
 # Extract AB#123 references
 $ids = [regex]::Matches($commitMessage, 'AB#(\d+)') |
