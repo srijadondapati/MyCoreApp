@@ -5,11 +5,16 @@
 # =========================================================
 
 param(
-    [string]$Organization,
-    [string]$Project,
-    [string]$PersonalAccessToken,
-    [string]$EnvironmentTag
+  [Parameter(Mandatory)]
+  [string]$Organization,
+
+  [Parameter(Mandatory)]
+  [string]$Project,
+
+  [Parameter(Mandatory)]
+  [string]$EnvironmentTag
 )
+
 
 # Set console output encoding to UTF-8
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -31,10 +36,6 @@ if ([string]::IsNullOrWhiteSpace($Project)) {
     throw "Project parameter is required."
 }
 
-if ([string]::IsNullOrWhiteSpace($PersonalAccessToken)) {
-    throw "Personal Access Token is required."
-}
-
 if ([string]::IsNullOrWhiteSpace($EnvironmentTag)) {
     throw "Environment Tag is required."
 }
@@ -53,15 +54,16 @@ Write-Host "Project: $Project"
 # SECTION 1: Build authentication header
 # =========================================================
 
-# Azure DevOps requires Basic Auth with Base64-encoded PAT
-$basicAuth = [Convert]::ToBase64String(
-    [Text.Encoding]::ASCII.GetBytes(":$PersonalAccessToken")
-)
+$accessToken = $env:SYSTEM_ACCESSTOKEN
+if ([string]::IsNullOrWhiteSpace($accessToken)) {
+  throw "System.AccessToken is missing. Enable OAuth access for the pipeline."
+}
 
 $headers = @{
-    Authorization = "Basic $basicAuth"
-    "Content-Type" = "application/json-patch+json"
+  Authorization  = "Bearer $accessToken"
+  "Content-Type" = "application/json-patch+json"
 }
+
 
 # =========================================================
 # SECTION 2: Read FULL commit message from git
