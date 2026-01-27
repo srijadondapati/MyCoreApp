@@ -25,4 +25,4 @@ steps:
         -Organization "$(ADO_ORG)"
         -Project "$(ADO_PROJECT)"
         -PersonalAccessToken "$(ADO_PAT)"
-        -EnvironmentName "${{ parameters.environmentName }}"
+        -EnvironmentTag "${{ parameters.environmentName }}"
