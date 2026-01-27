@@ -1,3 +1,18 @@
+trigger:
+  branches:
+    include:
+      - master
+
+pool:
+  vmImage: 'windows-latest'
+
+variables:
+  - group: workitem-tagging-secrets
+  - name: buildConfiguration
+    value: 'Release'
+  - name: dotnetVersion
+    value: '10.x'
+
 jobs:
   # -------------------------------------------------
   # Build Job
@@ -6,28 +21,33 @@ jobs:
     displayName: Build MyCoreApp
     steps:
       - task: UseDotNet@2
+        displayName: Use .NET SDK
         inputs:
           packageType: 'sdk'
           version: '$(dotnetVersion)'
           includePreviewVersions: true
 
       - task: NuGetToolInstaller@1
+        displayName: Install NuGet
         inputs:
           versionSpec: '5.8.x'
 
       - task: NuGetCommand@2
+        displayName: Restore NuGet packages
         inputs:
           command: 'restore'
           restoreSolution: true
           feedsToUse: 'select'
 
       - task: DotNetCoreCLI@2
+        displayName: Build solution
         inputs:
           command: 'build'
           projects: '**/*.csproj'
           arguments: '--configuration $(buildConfiguration)'
 
       - task: DotNetCoreCLI@2
+        displayName: Publish projects
         inputs:
           command: 'publish'
           publishWebProjects: true
@@ -35,6 +55,7 @@ jobs:
           zipAfterPublish: true
 
       - task: PublishBuildArtifacts@1
+        displayName: Publish build artifacts
         inputs:
           PathtoPublish: '$(Build.ArtifactStagingDirectory)'
           ArtifactName: 'drop'
