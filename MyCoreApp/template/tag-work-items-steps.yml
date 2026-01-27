@@ -2,7 +2,7 @@
 # Template for tagging work items after deployment
 
 parameters:
-  - name: environmentName
+  - name: env
     type: string
     default: ''
 
@@ -24,6 +24,6 @@ steps:
       arguments: >
         -Organization "$(ADO_ORG)"
         -Project "$(ADO_PROJECT)"
-        -EnvironmentTag "${{ parameters.environmentName }}"
+        -EnvironmentTag "${{ parameters.env }}"
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)        
