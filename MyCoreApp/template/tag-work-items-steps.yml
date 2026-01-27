@@ -7,6 +7,15 @@ parameters:
     default: ''
 
 steps:
+  # --------------------------------------------------
+  # Ensure full git history is available
+  # --------------------------------------------------
+  - checkout: self
+    fetchDepth: 0
+
+  # --------------------------------------------------
+  # Update Azure DevOps Work Item Tags
+  # --------------------------------------------------
   - task: PowerShell@2
     displayName: 'Update Azure DevOps Work Item Tags'
     inputs:
@@ -16,5 +25,4 @@ steps:
         -Organization "$(ADO_ORG)"
         -Project "$(ADO_PROJECT)"
         -PersonalAccessToken "$(ADO_PAT)"
-        -EnvironmentTag "DeployedEnv:${{ parameters.environmentName }}"
-        -CommitMessage "$(Build.SourceVersionMessage)"
+        -EnvironmentName "${{ parameters.environmentName }}"
