@@ -26,4 +26,5 @@ steps:
         -Project "$(ADO_PROJECT)"
         -EnvironmentTag "${{ parameters.env }}"
     env:
-      SYSTEM_ACCESSTOKEN: $(System.AccessToken)        
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken) 
+      GITHUB_TOKEN: $(GitHubToken)
