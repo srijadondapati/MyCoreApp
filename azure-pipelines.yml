@@ -66,4 +66,4 @@ jobs:
   steps:
   - template: MyCoreApp/template/tag-work-items-steps.yml
     parameters:
-      environmentName: prod
+      environmentName: PROD
