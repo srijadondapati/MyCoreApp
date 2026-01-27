@@ -10,6 +10,10 @@ on:
       - ready_for_review
   workflow_dispatch:
 
+permissions:
+  pull-requests: read
+  contents: read
+
 jobs:
   enforce-ab:
     name: Enforce AB# in PRs
@@ -18,12 +22,12 @@ jobs:
     steps:
       - name: Check PR for AB# reference
         env:
-          PR_URL:    ${{ github.event.pull_request.html_url }}
+          GH_TOKEN:  ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO:      ${{ github.repository }}
           PR_BRANCH: ${{ github.event.pull_request.head.ref }}
-          PR_TITLE:  ${{ github.event.pull_request.title }}
-          PR_BODY:   ${{ github.event.pull_request.body }}
         run: |
-          echo "Checking PR: $PR_URL"
+          echo "Checking PR #$PR_NUMBER in $REPO"
           echo "Source branch: $PR_BRANCH"
 
           # Skip Codex PRs
@@ -32,23 +36,33 @@ jobs:
             exit 0
           fi
 
+          echo "Fetching PR details from GitHub API..."
+
+          PR_JSON=$(curl -s \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/$REPO/pulls/$PR_NUMBER)
+
+          PR_TITLE=$(echo "$PR_JSON" | jq -r '.title // ""')
+          PR_BODY=$(echo "$PR_JSON" | jq -r '.body // ""')
+
           echo "PR TITLE:"
           printf '%s\n' "$PR_TITLE"
+          echo "----------------------------------"
           echo "PR BODY:"
           printf '%s\n' "$PR_BODY"
+          echo "----------------------------------"
 
-          # Match AB#1234, [AB#1234], [AB#1234](url); allow optional space after '#'
-          REGEX='(\[)?AB#\s*[0-9]+(\])?(\([^)]+\))?'
+          REGEX='AB#\s*[0-9]+'
 
-          # Safely combine title + body (no inline interpolation)
-          CONTENT=$(printf '%s\n%s' "$PR_TITLE" "$PR_BODY")
+          CONTENT="$(printf '%s\n%s' "$PR_TITLE" "$PR_BODY")"
 
-          # Count matches (multiple AB# refs are fine)
-          MATCHES=$(printf '%s' "$CONTENT" | grep -oE "$REGEX" | wc -l)
+          MATCHES=$(printf '%s' "$CONTENT" | grep -oE "$REGEX" | wc -l || true)
 
           if [[ "$MATCHES" -ge 1 ]]; then
-            echo "✅ Found $MATCHES AB# reference(s) in title/body."
+            echo "✅ Found $MATCHES AB# reference(s) in PR title or description."
           else
-            echo "❌ Missing AB# reference. Please include at least one 'AB#1234' in the PR title or description."
+            echo "❌ Missing AB# reference."
+            echo "Please include AB#1234 in the PR title OR description."
             exit 1
           fi
