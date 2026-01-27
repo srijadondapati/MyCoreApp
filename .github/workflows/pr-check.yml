@@ -1,0 +1,54 @@
+name: Enforce AB# in PRs
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+      - ready_for_review
+  workflow_dispatch:
+
+jobs:
+  enforce-ab:
+    name: Enforce AB# in PRs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check PR for AB# reference
+        env:
+          PR_URL:    ${{ github.event.pull_request.html_url }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          PR_TITLE:  ${{ github.event.pull_request.title }}
+          PR_BODY:   ${{ github.event.pull_request.body }}
+        run: |
+          echo "Checking PR: $PR_URL"
+          echo "Source branch: $PR_BRANCH"
+
+          # Skip Codex PRs
+          if [[ "$PR_BRANCH" == codex/* ]]; then
+            echo "✅ Codex PR detected. Skipping AB# enforcement."
+            exit 0
+          fi
+
+          echo "PR TITLE:"
+          printf '%s\n' "$PR_TITLE"
+          echo "PR BODY:"
+          printf '%s\n' "$PR_BODY"
+
+          # Match AB#1234, [AB#1234], [AB#1234](url); allow optional space after '#'
+          REGEX='(\[)?AB#\s*[0-9]+(\])?(\([^)]+\))?'
+
+          # Safely combine title + body (no inline interpolation)
+          CONTENT=$(printf '%s\n%s' "$PR_TITLE" "$PR_BODY")
+
+          # Count matches (multiple AB# refs are fine)
+          MATCHES=$(printf '%s' "$CONTENT" | grep -oE "$REGEX" | wc -l)
+
+          if [[ "$MATCHES" -ge 1 ]]; then
+            echo "✅ Found $MATCHES AB# reference(s) in title/body."
+          else
+            echo "❌ Missing AB# reference. Please include at least one 'AB#1234' in the PR title or description."
+            exit 1
+          fi
