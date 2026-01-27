@@ -1,4 +1,4 @@
-#TESTING THE title.##
+#TESTING THE title.###
 trigger:
   branches:
     include:
