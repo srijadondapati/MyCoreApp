@@ -20,6 +20,6 @@ jobs:
           # Work Item Tagging
           # ==================================================
           - ${{ if eq(parameters.enableWorkItemTagging, true) }}:
-            - template: MyCoreApp/template/tag-work-items-steps.yml
+            - template: MyCoreApp/template/tag-workitems.yaml
               parameters:
                 environment: ${{ parameters.env }}
