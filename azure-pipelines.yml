@@ -72,4 +72,4 @@ jobs:
     steps:
       - template: MyCoreApp/template/tag-work-items-steps.yml
         parameters:
-          environmentName: qa
+          env: qa
