@@ -8,8 +8,7 @@ param(
     [string]$Organization,
     [string]$Project,
     [string]$PersonalAccessToken,
-    [string]$EnvironmentTag,
-    [string]$CommitMessage
+    [string]$EnvironmentTag
 )
 
 # Set console output encoding to UTF-8
@@ -64,20 +63,23 @@ $headers = @{
 }
 
 # =========================================================
-# SECTION 2: Extract Work Item IDs from commit message
+# SECTION 2: Read FULL commit message from git
 # =========================================================
 
-Write-Host "Commit Message: $CommitMessage"
+$commitMessage = git log -1 --pretty=%B
 
-# Extract work item IDs referenced using AB#<id>
-$ids = [regex]::Matches($CommitMessage, 'AB#(\d+)') |
+Write-Host "Full Commit Message:"
+Write-Host "------------------------------------------"
+Write-Host $commitMessage
+Write-Host "------------------------------------------"
+
+# Extract AB#123 references
+$ids = [regex]::Matches($commitMessage, 'AB#(\d+)') |
        ForEach-Object { $_.Groups[1].Value } |
        Select-Object -Unique
 
-# Log discovered work item IDs
 Write-Host "Found work item IDs: $($ids -join ', ')"
 
-# Exit early if no work items are referenced
 if ($ids.Count -eq 0) {
     Write-Host "No work items found. Skipping."
     exit 0
