@@ -56,14 +56,14 @@ jobs:
           ArtifactName: 'drop'
           publishLocation: 'Container'
 
-  # -------------------------------------------------
-  # Tag Work Items – DEV
-  # -------------------------------------------------
-  - job: Tag_PROD
-    displayName: Tag Work Items - DEV
-    dependsOn: Build
-    condition: succeeded()
-    steps:
-      - template: MyCoreApp/template/tag-work-items-steps.yml
-        parameters:
-          environmentName: DEV
+# -------------------------------------------------
+# Tag Work Items – PROD
+# -------------------------------------------------
+- job: Tag_PROD
+  displayName: Tag Work Items - PROD
+  dependsOn: Build
+  condition: succeeded()
+  steps:
+  - template: MyCoreApp/template/tag-work-items-steps.yml
+    parameters:
+      environmentName: prod
