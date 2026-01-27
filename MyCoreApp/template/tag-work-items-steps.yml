@@ -24,5 +24,6 @@ steps:
       arguments: >
         -Organization "$(ADO_ORG)"
         -Project "$(ADO_PROJECT)"
-        -PersonalAccessToken "$(ADO_PAT)"
         -EnvironmentTag "${{ parameters.environmentName }}"
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)        
