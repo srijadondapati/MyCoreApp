@@ -1,316 +1,270 @@
 # =========================================================
-# Update-WorkItemTags-FIXED.ps1
-# =========================================================
-# FIXED: Properly gets pipeline variables
+# Update-WorkItemTags.ps1
+# ---------------------------------------------------------
+# Purpose:
+#   - Detect Azure DevOps Work Item IDs (AB#123)
+#   - From commit messages, ADO PR metadata, or GitHub PRs
+#   - Apply an environment deployment tag to each work item
+#
+# Requirements:
+#   - Pipeline OAuth token enabled (System.AccessToken)
+#   - Optional: GITHUB_TOKEN for GitHub PR inspection
 # =========================================================
 
 param(
-  [Parameter(Mandatory)]
-  [string]$Organization,
+    [Parameter(Mandatory)]
+    [string]$Organization,
 
-  [Parameter(Mandatory)]
-  [string]$Project,
+    [Parameter(Mandatory)]
+    [string]$Project,
 
-  [Parameter(Mandatory)]
-  [string]$EnvironmentTag
+    [Parameter(Mandatory)]
+    [string]$EnvironmentTag
 )
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 # =========================================================
-# SECTION 0: Configuration
+# SECTION 0: Initialization & Validation
 # =========================================================
 
 Write-Host "=========================================="
 Write-Host "Azure DevOps Work Item Tagging"
 Write-Host "=========================================="
 
-# Validate parameters
-if ([string]::IsNullOrWhiteSpace($Organization) -or 
-    [string]::IsNullOrWhiteSpace($Project) -or 
-    [string]::IsNullOrWhiteSpace($EnvironmentTag)) {
-    throw "All parameters are required"
+if (
+    [string]::IsNullOrWhiteSpace($Organization) -or
+    [string]::IsNullOrWhiteSpace($Project) -or
+    [string]::IsNullOrWhiteSpace($EnvironmentTag)
+) {
+    throw "Organization, Project, and EnvironmentTag are required."
 }
 
+# Normalize environment tag
 $EnvironmentTag = "DeployedEnv:$($EnvironmentTag.ToUpperInvariant())"
 
-Write-Host "Environment Tag: $EnvironmentTag"
-Write-Host "Organization: $Organization"
-Write-Host "Project: $Project"
+Write-Host "Organization    : $Organization"
+Write-Host "Project         : $Project"
+Write-Host "Environment Tag : $EnvironmentTag"
 Write-Host ""
 
 # =========================================================
-# SECTION 1: Authentication
+# SECTION 1: Azure DevOps Authentication
 # =========================================================
 
 $accessToken = $env:SYSTEM_ACCESSTOKEN
 if ([string]::IsNullOrWhiteSpace($accessToken)) {
-    Write-Host "❌ ERROR: System.AccessToken is missing!"
-    Write-Host "💡 Enable OAuth token access in pipeline settings"
+    Write-Host "❌ System.AccessToken is missing"
+    Write-Host "💡 Enable 'Allow scripts to access OAuth token'"
     exit 1
 }
 
-Write-Host "✅ Using System.AccessToken"
 $headers = @{
     Authorization  = "Bearer $accessToken"
     "Content-Type" = "application/json-patch+json"
 }
 
+Write-Host "✅ Using System.AccessToken"
+
 # =========================================================
-# SECTION 2: Work Item Extraction Functions
+# SECTION 2: Work Item Discovery Functions
 # =========================================================
 
 function Get-WorkItemsFromCommit {
-    Write-Host "🔍 Method 1: Checking git commit message..."
-    
-    $ids = @()
+    Write-Host "🔍 Method 1: Commit message"
+
     try {
         $commitMsg = git log -1 --pretty=%B
         Write-Host "   Commit: $commitMsg"
-        
-        $ids = [regex]::Matches($commitMsg, 'AB#(\d+)') | ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique
-        
-        if ($ids.Count -gt 0) {
-            Write-Host "   ✅ Found in commit: $($ids -join ', ')"
-        }
-    } catch {
-        Write-Host "   ⚠️ Could not get commit message"
+
+        return (
+            [regex]::Matches($commitMsg, 'AB#(\d+)') |
+            ForEach-Object { $_.Groups[1].Value } |
+            Select-Object -Unique
+        )
     }
-    
-    return $ids
+    catch {
+        Write-Host "   ⚠️ Unable to read commit message"
+        return @()
+    }
 }
 
 function Get-WorkItemsFromADO {
-    Write-Host "🔍 Method 2: Checking Azure DevOps PR variables..."
-    
-    $ids = @()
-    
-    # FIXED: Get from environment variables, not $(...)
-    $prTitle = $env:SYSTEM_PULLREQUEST_SOURCECOMMITMESSAGE
+    Write-Host "🔍 Method 2: Azure DevOps PR variables"
+
+    $prTitle       = $env:SYSTEM_PULLREQUEST_SOURCECOMMITMESSAGE
     $prDescription = $env:SYSTEM_PULLREQUEST_DESCRIPTION
-    
-    Write-Host "   PR Title: $prTitle"
+
+    Write-Host "   PR Title      : $prTitle"
     Write-Host "   PR Description: $prDescription"
-    
-    if (-not [string]::IsNullOrWhiteSpace($prTitle) -or 
-        -not [string]::IsNullOrWhiteSpace($prDescription)) {
-        
-        $prText = $prTitle + " " + $prDescription
-        $ids = [regex]::Matches($prText, 'AB#(\d+)') | ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique
-        
-        if ($ids.Count -gt 0) {
-            Write-Host "   ✅ Found in ADO PR: $($ids -join ', ')"
-        }
+
+    if (
+        [string]::IsNullOrWhiteSpace($prTitle) -and
+        [string]::IsNullOrWhiteSpace($prDescription)
+    ) {
+        return @()
     }
-    
-    return $ids
+
+    $text = "$prTitle $prDescription"
+
+    return (
+        [regex]::Matches($text, 'AB#(\d+)') |
+        ForEach-Object { $_.Groups[1].Value } |
+        Select-Object -Unique
+    )
 }
 
 function Get-WorkItemsFromGitHubPR {
-    Write-Host "🔍 Method 3: Checking GitHub PR..."
-    
+    Write-Host "🔍 Method 3: GitHub PR (merge commit inspection)"
+
     $ids = @()
-    
-    # Check if this is a GitHub merge commit
+
     $commitMsg = git log -1 --pretty=%B
-    if ($commitMsg -match "Merge pull request #(\d+)") {
-        $prNumber = $matches[1]
-        Write-Host "   Detected GitHub PR #$prNumber"
-        
-        # ==========================================
-        # FIX 1: Get repository name from environment
-        # ==========================================
-        $repo = ""
-        
-        # Method 1: Try environment variable
-        $repoName = $env:BUILD_REPOSITORY_NAME
-        Write-Host "   BUILD_REPOSITORY_NAME: $repoName"
-        
-        if (-not [string]::IsNullOrWhiteSpace($repoName)) {
-            # Check if it's already in "owner/repo" format
-            if ($repoName -match "^[^/]+/[^/]+$") {
-                $repo = $repoName
-                Write-Host "   Repository: $repo"
-            } else {
-                # Try to get owner from BUILD_REPOSITORY_URI
-                $repoUri = $env:BUILD_REPOSITORY_URI
-                Write-Host "   BUILD_REPOSITORY_URI: $repoUri"
-                
-                if (-not [string]::IsNullOrWhiteSpace($repoUri) -and $repoUri -match "github\.com/([^/]+)/") {
-                    $owner = $matches[1]
-                    $repo = "$owner/$repoName"
-                    Write-Host "   Repository (constructed): $repo"
-                }
-            }
-        }
-        
-        if ([string]::IsNullOrWhiteSpace($repo)) {
-            Write-Host "   ❌ Could not determine GitHub repository"
-            return $ids
-        }
-        
-        # ==========================================
-        # FIX 2: GitHub token from environment
-        # ==========================================
-        $githubToken = $env:GITHUB_TOKEN
-        if ([string]::IsNullOrWhiteSpace($githubToken)) {
-            Write-Host "   ❌ GITHUB_TOKEN is REQUIRED for GitHub PR extraction"
-            Write-Host "   💡 Add GitHubToken to your variable group"
-            return $ids
-        }
-        
-        Write-Host "   Fetching PR #$prNumber from $repo..."
-        
-        # ==========================================
-        # FIX 3: Use Bearer token
-        # ==========================================
-        $githubHeaders = @{
-            "Authorization" = "Bearer $githubToken"
-            "Accept" = "application/vnd.github.v3+json"
-        }
-        
-        $prUrl = "https://api.github.com/repos/$repo/pulls/$prNumber"
-        
-        try {
-            $prData = Invoke-RestMethod -Uri $prUrl -Headers $githubHeaders -ErrorAction Stop
-            
-            # Extract from PR title and body
-            $prText = $prData.title + " " + $prData.body
-            $ids = [regex]::Matches($prText, 'AB#(\d+)') | ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique
-            
-            if ($ids.Count -gt 0) {
-                Write-Host "   ✅ Found in GitHub PR: $($ids -join ', ')"
-            } else {
-                Write-Host "   ℹ️ No work items in GitHub PR"
-            }
-            
-        } catch {
-            Write-Host "   ❌ GitHub API error: $($_.Exception.Message)"
-            
-            if ($_.Exception.Response) {
-                $statusCode = $_.Exception.Response.StatusCode.value__
-                Write-Host "   Status Code: $statusCode"
-                
-                if ($statusCode -eq 404) {
-                    Write-Host "   💡 Repository '$repo' not found or no access"
-                } elseif ($statusCode -eq 401 -or $statusCode -eq 403) {
-                    Write-Host "   💡 GitHub token invalid or insufficient permissions"
-                }
-            }
-        }
-    } else {
+    if ($commitMsg -notmatch "Merge pull request #(\d+)") {
         Write-Host "   ℹ️ Not a GitHub merge commit"
+        return $ids
     }
-    
+
+    $prNumber = $matches[1]
+    Write-Host "   Detected GitHub PR #$prNumber"
+
+    # Resolve repository name
+    $repoName = $env:BUILD_REPOSITORY_NAME
+    $repoUri  = $env:BUILD_REPOSITORY_URI
+    $repo     = ""
+
+    if ($repoName -match "^[^/]+/[^/]+$") {
+        $repo = $repoName
+    }
+    elseif ($repoUri -match "github\.com/([^/]+)/") {
+        $repo = "$($matches[1])/$repoName"
+    }
+
+    if ([string]::IsNullOrWhiteSpace($repo)) {
+        Write-Host "   ❌ Unable to determine GitHub repository"
+        return $ids
+    }
+
+    $githubToken = $env:GITHUB_TOKEN
+    if ([string]::IsNullOrWhiteSpace($githubToken)) {
+        Write-Host "   ❌ GITHUB_TOKEN not provided"
+        return $ids
+    }
+
+    $githubHeaders = @{
+        Authorization = "Bearer $githubToken"
+        Accept        = "application/vnd.github.v3+json"
+    }
+
+    $prUrl = "https://api.github.com/repos/$repo/pulls/$prNumber"
+
+    try {
+        $pr = Invoke-RestMethod -Uri $prUrl -Headers $githubHeaders -ErrorAction Stop
+        $text = "$($pr.title) $($pr.body)"
+
+        $ids = (
+            [regex]::Matches($text, 'AB#(\d+)') |
+            ForEach-Object { $_.Groups[1].Value } |
+            Select-Object -Unique
+        )
+    }
+    catch {
+        Write-Host "   ❌ GitHub API error: $($_.Exception.Message)"
+    }
+
     return $ids
 }
 
 # =========================================================
-# SECTION 3: Main Execution
+# SECTION 3: Collect All Work Item IDs
 # =========================================================
 
-Write-Host "📋 Gathering work item references..."
+Write-Host ""
+Write-Host "📋 Collecting work items..."
+
+$allIds = @()
+$allIds += Get-WorkItemsFromCommit
+$allIds += Get-WorkItemsFromADO
+$allIds += Get-WorkItemsFromGitHubPR
+
+$workItemIds = $allIds | Select-Object -Unique
+
+Write-Host "   Total unique work items: $($workItemIds.Count)"
 Write-Host ""
 
-# Try all methods
-$commitIds = Get-WorkItemsFromCommit
-$adoPrIds = Get-WorkItemsFromADO
-$githubPrIds = Get-WorkItemsFromGitHubPR
-
-# Combine all IDs
-$allWorkItemIds = @()
-$allWorkItemIds += $commitIds
-$allWorkItemIds += $adoPrIds
-$allWorkItemIds += $githubPrIds
-
-$uniqueWorkItemIds = $allWorkItemIds | Select-Object -Unique
-
-Write-Host ""
-Write-Host "📊 COLLECTION SUMMARY:"
-Write-Host "   From commit: $($commitIds.Count)"
-Write-Host "   From ADO PR: $($adoPrIds.Count)"
-Write-Host "   From GitHub PR: $($githubPrIds.Count)"
-Write-Host "   Unique total: $($uniqueWorkItemIds.Count)"
-Write-Host ""
-
-if ($uniqueWorkItemIds.Count -eq 0) {
+if ($workItemIds.Count -eq 0) {
     Write-Host "❌ No work items found"
-    Write-Host ""
-    Write-Host "💡 For RELIABLE GitHub PR support:"
-    Write-Host "   1. Add GitHubToken to variable group (MANDATORY)"
-    Write-Host "   2. Ensure token has 'repo' scope"
-    Write-Host "   3. Put AB# in PR title (not just description)"
     exit 0
 }
 
-Write-Host "✅ Found work items: $($uniqueWorkItemIds -join ', ')"
-
 # =========================================================
-# SECTION 4: Tagging Logic
+# SECTION 4: Apply Tags to Work Items
 # =========================================================
 
-$successCount = 0
-$failureCount = 0
-$skippedCount = 0
+$success = 0
+$skipped = 0
+$failed  = 0
 
-Write-Host ""
-Write-Host "🔄 Processing work items..."
-Write-Host ""
+foreach ($id in $workItemIds) {
 
-foreach ($id in $uniqueWorkItemIds) {
-    Write-Host "➡️ Processing Work Item ID: $id"
-    Write-Host "----------------------------------------"
-    
+    Write-Host "➡️ Work Item $id"
+
     try {
-        $url = "https://dev.azure.com/$Organization/$Project/_apis/wit/workitems/$($id)?api-version=7.1-preview.3"
-        
-        $wi = Invoke-RestMethod -Method Get -Uri $url -Headers $headers
+        $url = "https://dev.azure.com/$Organization/$Project/_apis/wit/workitems/$id?api-version=7.1-preview.3"
+        $wi  = Invoke-RestMethod -Uri $url -Headers $headers
+
         $existingTags = $wi.fields.'System.Tags'
-        if ([string]::IsNullOrWhiteSpace($existingTags)) { $existingTags = "" }
-        
-        Write-Host "   Title: $($wi.fields.'System.Title')"
-        Write-Host "   Current Tags: '$existingTags'"
-        
-        if ($existingTags -match [regex]::Escape($EnvironmentTag)) { 
-            Write-Host "   ✅ Already tagged"
-            $skippedCount++
-            continue 
+        if ([string]::IsNullOrWhiteSpace($existingTags)) {
+            $existingTags = ""
         }
-        
-        $newTags = if ([string]::IsNullOrWhiteSpace($existingTags)) { $EnvironmentTag } else { "$existingTags; $EnvironmentTag" }
-        
-        $patchDoc = '[{"op":"replace","path":"/fields/System.Tags","value":"' + $newTags + '"}]'
-        
-        $response = Invoke-RestMethod -Method Patch -Uri $url -Headers $headers -Body $patchDoc
-        
-        Write-Host "   ✅ Updated successfully"
-        $successCount++
-        
-    } catch {
-        Write-Host "   ❌ Error: $($_.Exception.Message)"
-        $failureCount++
+
+        if ($existingTags -match [regex]::Escape($EnvironmentTag)) {
+            Write-Host "   ⏭️ Already tagged"
+            $skipped++
+            continue
+        }
+
+        $newTags = if ($existingTags) {
+            "$existingTags; $EnvironmentTag"
+        } else {
+            $EnvironmentTag
+        }
+
+        $patch = @(
+            @{
+                op    = "replace"
+                path  = "/fields/System.Tags"
+                value = $newTags
+            }
+        ) | ConvertTo-Json -Depth 3
+
+        Invoke-RestMethod -Method Patch -Uri $url -Headers $headers -Body $patch
+        Write-Host "   ✅ Updated"
+        $success++
     }
-    
-    Write-Host ""
+    catch {
+        Write-Host "   ❌ Failed: $($_.Exception.Message)"
+        $failed++
+    }
 }
 
 # =========================================================
-# SECTION 5: Summary
+# SECTION 5: Final Summary
 # =========================================================
 
 Write-Host "=========================================="
-Write-Host "📊 UPDATE SUMMARY"
+Write-Host "RESULT SUMMARY"
 Write-Host "=========================================="
-Write-Host "✅ Successfully updated: $successCount"
-Write-Host "⏭️  Skipped (already tagged): $skippedCount"
-Write-Host "❌ Failed: $failureCount"
-Write-Host "📋 Total referenced: $($uniqueWorkItemIds.Count)"
+Write-Host "Updated : $success"
+Write-Host "Skipped : $skipped"
+Write-Host "Failed  : $failed"
+Write-Host "Total   : $($workItemIds.Count)"
 Write-Host "=========================================="
 
-if ($failureCount -gt 0) {
-    Write-Host "##vso[task.logissue type=warning]Some work items failed to update"
+if ($failed -gt 0) {
+    Write-Host "##vso[task.logissue type=warning]Some work items failed"
     exit 1
 }
 
-Write-Host "🎉 All work items processed successfully!"
+Write-Host "🎉 All work items processed successfully"
 exit 0
